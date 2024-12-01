@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Threading.Tasks;
 using Cronometraje_Carreras_Deportivas.Data;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 
 #nullable enable
@@ -648,64 +649,95 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
-        [HttpPost]
-        public async Task<IActionResult> Alta_Carrera(string nom_carrera, int year_carrera)
+        [HttpGet]
+        public async Task<IActionResult> Crear_Carrera()
         {
-            _logger.LogInformation($"Datos recibidos: Nombre de la carrera = {nom_carrera}, Año = {year_carrera}");
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            var categorias = new List<SelectListItem>();
 
-            if (string.IsNullOrWhiteSpace(nom_carrera) || year_carrera <= 0)
+            using (SqlConnection connection = new SqlConnection(connectionString))
             {
-                return Json(new { success = false, message = "Datos inválidos. Por favor, revisa el nombre de la carrera y el año." });
+                await connection.OpenAsync();
+                string sql = "SELECT ID_categoria, nombre_categoria FROM CATEGORIA ORDER BY ID_categoria";
+                using (SqlCommand command = new SqlCommand(sql, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        categorias.Add(new SelectListItem
+                        {
+                            Value = reader["ID_categoria"].ToString(),
+                            Text = reader["nombre_categoria"].ToString()
+                        });
+                    }
+                }
             }
+
+            ViewBag.Categorias = categorias;
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Crear_Carrera(string nombreCarrera, int yearCarrera, List<int> categoriasSeleccionadas)
+        {
+            if (categoriasSeleccionadas == null || categoriasSeleccionadas.Count != 3)
+            {
+                return Json(new { success = false, message = "Debes seleccionar exactamente tres categorías diferentes." });
+            }
+
+            categoriasSeleccionadas.Sort(); // Ordenar las categorías seleccionadas de menor a mayor.
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            int idCarrera;
 
             try
             {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                int nuevaEdicion = 1; // Edición inicial
-
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // Obtener la última edición para la combinación de nombre y año
-                    string selectSql = @"
-            SELECT MAX(edi_carrera) 
-            FROM CARRERA 
-            WHERE nom_carrera = @nom_carrera AND year_carrera = @year_carrera";
-                    using (SqlCommand selectCommand = new SqlCommand(selectSql, connection))
-                    {
-                        selectCommand.Parameters.AddWithValue("@nom_carrera", nom_carrera);
-                        selectCommand.Parameters.AddWithValue("@year_carrera", year_carrera);
+                    string insertCarreraSql = @"
+                INSERT INTO CARRERA (nom_carrera, year_carrera, edi_carrera)
+                OUTPUT INSERTED.ID_carrera
+                VALUES (@NombreCarrera, @YearCarrera,
+                    COALESCE(
+                        (SELECT MAX(edi_carrera) + 1 
+                         FROM CARRERA 
+                         WHERE nom_carrera = @NombreCarrera AND year_carrera = @YearCarrera),
+                        1 -- Si no hay registros previos, inicia con edición 1
+                    )
+                );";
 
-                        object result = await selectCommand.ExecuteScalarAsync();
-                        if (result != DBNull.Value && result != null)
-                        {
-                            nuevaEdicion = Convert.ToInt32(result) + 1;
-                        }
+                    using (SqlCommand command = new SqlCommand(insertCarreraSql, connection))
+                    {
+                        command.Parameters.AddWithValue("@NombreCarrera", nombreCarrera);
+                        command.Parameters.AddWithValue("@YearCarrera", yearCarrera);
+
+                        idCarrera = (int)await command.ExecuteScalarAsync();
                     }
 
-                    // Insertar la nueva carrera con la edición calculada
-                    string insertSql = "INSERT INTO CARRERA (nom_carrera, year_carrera, edi_carrera) VALUES (@nom_carrera, @year_carrera, @edi_carrera)";
-                    using (SqlCommand insertCommand = new SqlCommand(insertSql, connection))
+                    string insertCategoriasSql = "INSERT INTO CARR_Cat (ID_carrera, ID_categoria) VALUES (@IDCarrera, @IDCategoria)";
+                    foreach (var categoriaId in categoriasSeleccionadas)
                     {
-                        insertCommand.Parameters.AddWithValue("@nom_carrera", nom_carrera);
-                        insertCommand.Parameters.AddWithValue("@year_carrera", year_carrera);
-                        insertCommand.Parameters.AddWithValue("@edi_carrera", nuevaEdicion);
-
-                        await insertCommand.ExecuteNonQueryAsync();
+                        using (SqlCommand command = new SqlCommand(insertCategoriasSql, connection))
+                        {
+                            command.Parameters.AddWithValue("@IDCarrera", idCarrera);
+                            command.Parameters.AddWithValue("@IDCategoria", categoriaId);
+                            await command.ExecuteNonQueryAsync();
+                        }
                     }
                 }
 
-                // Registro exitoso
-                _logger.LogInformation($"Nueva carrera '{nom_carrera}' para el año {year_carrera}, edición {nuevaEdicion} registrada exitosamente.");
-                return Json(new { success = true, message = "Carrera registrada exitosamente." });
+                return Json(new { success = true, message = "Carrera creada exitosamente." });
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al registrar la carrera: {ex.Message}");
-                return Json(new { success = false, message = "Ocurrió un error al registrar la carrera. Inténtalo más tarde." });
+                _logger.LogError($"Error al crear la carrera: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al crear la carrera." });
             }
         }
+
+
 
         [HttpGet]
         public async Task<IActionResult> ObtenerCarrerasConCategorias()
