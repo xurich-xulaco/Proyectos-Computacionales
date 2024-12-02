@@ -1,0 +1,97 @@
+﻿<div class="modal-container" style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: rgba(0, 0, 0, 0.05);">
+    <div class="modal-content" style="width: 600px; padding: 20px; border-radius: 8px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);">
+        <h2 style="text-align: center; margin-bottom: 20px;">Crear Nuevo Corredor</h2>
+        <form id="crearCorredorForm">
+            <div style="margin-bottom: 15px;">
+                <label for="Nombre">Nombre</label>
+                <input type="text" id="Nombre" name="Nombre" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="Apaterno">Apellido Paterno</label>
+                <input type="text" id="Apaterno" name="Apaterno" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="Amaterno">Apellido Materno</label>
+                <input type="text" id="Amaterno" name="Amaterno" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="Fnacimiento">Fecha de Nacimiento</label>
+                <input type="date" id="Fnacimiento" name="Fnacimiento" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="sexo">Sexo</label>
+                <select id="sexo" name="sexo" class="form-control" required>
+                    <option value="">Seleccionar</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Femenino">Femenino</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="correo">Correo Electrónico</label>
+                <input type="email" id="correo" name="correo" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="pais">País</label>
+                <input type="text" id="pais" name="pais" class="form-control" required />
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="telefono">Número Telefónico</label>
+                <input type="tel" id="telefono" name="telefono" class="form-control" required />
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button type="button" class="btn btn-danger" onclick="window.location.href='@Url.Action("Pantalla_ini", "Home")'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Crear</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.getElementById('crearCorredorForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            const sexoSelect = document.getElementById('sexo');
+            const sexoValue = sexoSelect.value;
+            if (sexoValue === 'Masculino') {
+                formData.set('sexo', 'M');
+            } else if (sexoValue === 'Femenino') {
+                formData.set('sexo', 'F');
+            }
+
+            try {
+                const response = await fetch('@Url.Action("Alta_Corredor", "Home")', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: result.message,
+                        timer: 3000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = '@Url.Action("Pantalla_ini", "Home")';
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: result.message
+                    });
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Ocurrió un error inesperado.'
+                });
+            }
+        });
+    </script>
+}

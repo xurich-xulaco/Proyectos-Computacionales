@@ -141,6 +141,19 @@
         <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Carrera</a></li>
     </ul>
 </div>
+<div class="dropdown mt-3">
+    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCorredoresMenu" data-bs-toggle="dropdown" aria-expanded="false">
+        Gestión de Corredores
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCorredoresMenu">
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo corredor</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Elimina corredor</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Modificar corredor</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Importar corredores</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Exportar corredores</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Generar reporte de corredor</button>
+    </ul>
+</div>
 
 <!-- Modal Eliminar Carrera -->
 <div class="modal fade" id="modalEliminarCarrera" tabindex="-1" aria-labelledby="modalEliminarCarreraLabel" aria-hidden="true">

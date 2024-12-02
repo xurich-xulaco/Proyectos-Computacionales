@@ -10,6 +10,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Cronometraje_Carreras_Deportivas.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using ClosedXML.Excel;
+using System.Data;
 
 
 #nullable enable
@@ -118,7 +120,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del super administrador (sin hashing)
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -170,7 +172,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del superadministrador
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -487,64 +489,84 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             return Json(categorias);
         }
 
-        public async Task<IActionResult> Alta_Corredor(string Nombre, string Apaterno, string Amaterno, DateOnly Fnacimiento, string pais, string sexo, string telefono, string correo)
+        [HttpGet]
+        public IActionResult Crear_Corredor()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Alta_Corredor(string Nombre, string Apaterno, string Amaterno, string Fnacimiento, string pais, string sexo, string telefono, string correo)
         {
             try
             {
+                // Validar que el campo 'pais' no esté vacío
+                if (string.IsNullOrWhiteSpace(pais))
+                {
+                    return Json(new { success = false, message = "El campo 'pais' es obligatorio." });
+                }
+
+                // Validar la longitud del país (ajusta según tus requisitos)
+                if (pais.Length < 2 || pais.Length > 50) // Ejemplo de longitud permitida
+                {
+                    return Json(new { success = false, message = "El país debe tener entre 2 y 50 caracteres." });
+                }
+
+                // Convertir la fecha de string a DateOnly
+                if (!DateOnly.TryParse(Fnacimiento, out DateOnly fechaNacimiento))
+                {
+                    return Json(new { success = false, message = "La fecha de nacimiento no es válida." });
+                }
+
+                // Convertir DateOnly a DateTime
+                DateTime fechaNacimientoDateTime = fechaNacimiento.ToDateTime(TimeOnly.MinValue);
+
                 string connectionString = _configuration.GetConnectionString("DefaultConnection");
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
                     // Verificar si el corredor ya existe en la base de datos
-                    string checkSql = "SELECT COUNT(*) FROM Corredor WHERE Nombre = @Nombre AND Apaterno = @Apaterno AND Amaterno = @Amaterno AND Fnacimiento = @Fnacimiento";
+                    string checkSql = "SELECT COUNT(*) FROM CORREDOR WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno AND apM_corredor = @Amaterno AND f_corredor = @Fnacimiento";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@Nombre", Nombre);
                         checkCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
                         checkCommand.Parameters.AddWithValue("@Amaterno", Amaterno);
-                        checkCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+                        checkCommand.Parameters.Add("@Fnacimiento", SqlDbType.Date).Value = fechaNacimientoDateTime;
 
                         int count = (int)await checkCommand.ExecuteScalarAsync();
                         if (count > 0)
                         {
-                            // Corredor ya existe
-                            _logger.LogWarning($"Corredor {Nombre} {Apaterno} ya existente");
-                            ModelState.AddModelError(string.Empty, "El corredor ya est� registrado.");
-                            return View();
+                            return Json(new { success = false, message = "El corredor ya está registrado." });
                         }
                     }
 
                     // Insertar el nuevo corredor
-                    string sql = "INSERT INTO Corredor (Nombre, Apaterno, Amaterno, Fnacimiento, Pais, Sexo, Telefono, Correo) VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Pais, @Sexo, @Telefono, @Correo)";
+                    string sql = "INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, f_corredor, sex_corredor, c_corredor, pais) VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@Nombre", Nombre);
                         command.Parameters.AddWithValue("@Apaterno", Apaterno);
                         command.Parameters.AddWithValue("@Amaterno", Amaterno);
-                        command.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                        command.Parameters.AddWithValue("@Pais", pais);
+                        command.Parameters.Add("@Fnacimiento", SqlDbType.Date).Value = fechaNacimientoDateTime;
                         command.Parameters.AddWithValue("@Sexo", sexo);
-                        command.Parameters.AddWithValue("@Telefono", telefono);
                         command.Parameters.AddWithValue("@Correo", correo);
+                        command.Parameters.AddWithValue("@Pais", pais); // Asegúrate de que se esté pasando el país
 
                         await command.ExecuteNonQueryAsync();
                     }
                 }
 
-                // Registro exitoso
-                _logger.LogInformation($"Nuevo corredor {Nombre} {Apaterno} registrado exitosamente.");
-                TempData["SuccessMessage"] = "Corredor registrado exitosamente.";
-                return RedirectToAction("Index");
+                // Si la inserción es exitosa
+                return Json(new { success = true, message = "Corredor registrado exitosamente." });
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error durante el registro del corredor: {ex.Message}");
-                ModelState.AddModelError(string.Empty, "Error al registrar el corredor. Por favor, int�ntelo de nuevo m�s tarde.");
-                return View();
+                return Json(new { success = false, message = "Ocurrió un error al registrar el corredor. " + ex.Message });
             }
         }
-
 
         public async Task<IActionResult> Baja_Corredor(int corredorId)
         {
@@ -1135,6 +1157,72 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             Console.WriteLine($"Datos de la Carrera: {resultado.Nombre}, {resultado.Year}, Categorías: {resultado.Categorias.Count}");
 
             return Json(resultado);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> Subir_ArchivoCorredor(IFormFile archivoSubido)
+        {
+            if (archivoSubido != null && archivoSubido.Length > 0)
+            {
+                using (var stream = new MemoryStream())
+                {
+                    archivoSubido.CopyTo(stream);
+                    using (var workbook = new XLWorkbook(stream))
+                    {
+                        var worksheet = workbook.Worksheet(1);
+                        var filas = worksheet.RowsUsed();
+
+                        foreach (var fila in filas.Skip(1))
+                        {
+                            var nom_corredor = fila.Cell(1).GetString();
+                            var apellido_paterno = fila.Cell(2).GetString();
+                            var apellido_materno = fila.Cell(3).GetString();
+                            var fecha_cumpleanios_celda = fila.Cell(4);
+                            var sexo_corredor = fila.Cell(5).GetString().Trim();
+                            var correo_corredor = fila.Cell(6).GetString();
+                            var pais = fila.Cell(7).GetString();
+                            var telefono = fila.Cell(8).GetString();
+
+                            if (sexo_corredor != "M" && sexo_corredor != "F") // Cambié || por &&
+                            {
+                                _logger.LogWarning($"El valor del sexo del corredor en la fila {fila.RowNumber()} no es valido. Debe ser 'M' o 'F'.");
+                                ModelState.AddModelError(string.Empty, "Sexo de corredor no valido.");
+                                return View();
+                            }
+
+                            string fechaCumpleaniosString;
+                            try
+                            {
+                                // Convertir la fecha a string en el formato deseado
+                                var fechaCumpleanios = fecha_cumpleanios_celda.GetDateTime();
+                                fechaCumpleaniosString = fechaCumpleanios.ToString("yyyy-MM-dd"); // Cambia el formato según sea necesario
+                            }
+                            catch (Exception)
+                            {
+                                _logger.LogWarning($"La fecha de cumpleanios del corredor en la fila {fila.RowNumber()} no es valida");
+                                ModelState.AddModelError(string.Empty, "Cumpleaños de corredor no valido.");
+                                return View();
+                            }
+
+                            await Alta_Corredor(Nombre: nom_corredor, Apaterno: apellido_paterno, Amaterno: apellido_materno, Fnacimiento: fechaCumpleaniosString, pais: pais, sexo: sexo_corredor, telefono: telefono, correo: correo_corredor);
+                        }
+                    }
+                }
+                if (string.IsNullOrEmpty(ViewBag.Message))
+                {
+                    _logger.LogInformation("Archivo procesado exitosamente");
+                    TempData["SuccessMessage"] = "Archivo procesado exitosamente";
+                }
+            }
+            else
+            {
+                _logger.LogError("El archivo subido no es de tipo .xlsx");
+                ModelState.AddModelError(string.Empty, "Por favor, selecciona un archivo valido");
+                return View();
+            }
+
+            return View();
         }
 
 
