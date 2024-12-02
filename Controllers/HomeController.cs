@@ -346,9 +346,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             ViewBag.Anios = anios;
         }
 
-
-
-
         [HttpGet]
         public async Task<IActionResult> CargarEdiciones(int yearCarrera)
         {
@@ -596,64 +593,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
-
-
-        public async Task<IActionResult> Editar_Corredor(int corredorId, string Nombre, string Apaterno, string Amaterno, DateOnly Fnacimiento, string pais, string sexo, string telefono, string correo)
-        {
-            try
-            {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    // Verificar si el corredor existe
-                    string checkSql = "SELECT COUNT(*) FROM Corredor WHERE CorredorId = @CorredorId";
-                    using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@CorredorId", corredorId);
-                        int count = (int)await checkCommand.ExecuteScalarAsync();
-
-                        if (count == 0)
-                        {
-                            // Corredor no encontrado
-                            _logger.LogWarning($"Corredor con ID {corredorId} no encontrado.");
-                            ModelState.AddModelError(string.Empty, "Corredor no encontrado.");
-                            return View();
-                        }
-                    }
-
-                    // Actualizar los datos del corredor
-                    string updateSql = "UPDATE Corredor SET Nombre = @Nombre, Apaterno = @Apaterno, Amaterno = @Amaterno, Fnacimiento = @Fnacimiento, Pais = @Pais, Sexo = @Sexo, Telefono = @Telefono, Correo = @Correo WHERE CorredorId = @CorredorId";
-                    using (SqlCommand updateCommand = new SqlCommand(updateSql, connection))
-                    {
-                        updateCommand.Parameters.AddWithValue("@CorredorId", corredorId);
-                        updateCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                        updateCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        updateCommand.Parameters.AddWithValue("@Amaterno", Amaterno);
-                        updateCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                        updateCommand.Parameters.AddWithValue("@Pais", pais);
-                        updateCommand.Parameters.AddWithValue("@Sexo", sexo);
-                        updateCommand.Parameters.AddWithValue("@Telefono", telefono);
-                        updateCommand.Parameters.AddWithValue("@Correo", correo);
-
-                        await updateCommand.ExecuteNonQueryAsync();
-                    }
-                }
-
-                // Edici�n exitosa
-                _logger.LogInformation($"Corredor con ID {corredorId} editado exitosamente.");
-                TempData["SuccessMessage"] = "Datos del corredor actualizados exitosamente.";
-                return RedirectToAction("Index");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al editar los datos del corredor: {ex.Message}");
-                ModelState.AddModelError(string.Empty, "Error al actualizar los datos del corredor. Por favor, int�ntelo de nuevo m�s tarde.");
-                return View();
-            }
-        }
-
         [HttpGet]
         public async Task<IActionResult> Crear_Carrera()
         {
@@ -824,8 +763,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             return View();
         }
 
-
-
         [HttpPost]
         public async Task<IActionResult> Eliminar_Carrera(int carreraId)
         {
@@ -855,9 +792,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             // Después de eliminar la carrera y los registros relacionados, redirigir con un mensaje de éxito
             return Json(new { success = true });
         }
-
-
-
 
         private async Task<List<string>> ObtenerCategoriasPorCarrera(int carreraId)
         {
@@ -943,40 +877,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             return resultados;
         }
 
-
-        public async Task<IActionResult> Editar_Carrera(int carreraId, string nom_carrera, int year_carrera)
-        {
-            try
-            {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    // Actualizar los datos de la carrera
-                    string updateSql = "UPDATE CARRERA SET nom_carrera = @nom_carrera, year_carrera = @year_carrera WHERE carreraId = @carreraId";
-                    using (SqlCommand updateCommand = new SqlCommand(updateSql, connection))
-                    {
-                        updateCommand.Parameters.AddWithValue("@carreraId", carreraId);
-                        updateCommand.Parameters.AddWithValue("@nom_carrera", nom_carrera);
-                        updateCommand.Parameters.AddWithValue("@year_carrera", year_carrera);
-
-                        await updateCommand.ExecuteNonQueryAsync();
-                    }
-                }
-
-                _logger.LogInformation($"Carrera con ID {carreraId} editada exitosamente.");
-                TempData["SuccessMessage"] = "Datos de la carrera actualizados exitosamente.";
-                return RedirectToAction("Index");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al editar los datos de la carrera: {ex.Message}");
-                ModelState.AddModelError(string.Empty, "Error al actualizar los datos de la carrera. Por favor, inténtelo de nuevo más tarde.");
-                return View();
-            }
-        }
-
         [HttpGet]
         public async Task<IActionResult> ObtenerCarreras()
         {
@@ -1049,12 +949,213 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
+        
 
+        [HttpGet]
+        public async Task<IActionResult> Editar_Carrera()
+        {
+            var carreras = new List<object>();
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                string query = @"
+            SELECT 
+                ca.ID_carrera,
+                CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', ' (', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+            FROM CARRERA ca
+            JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera
+            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+            GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+            HAVING COUNT(cc.ID_categoria) = 3
+            ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        carreras.Add(new
+                        {
+                            Id = reader.GetInt32(0),
+                            Descripcion = reader.GetString(1)
+                        });
+                    }
+                }
+            }
+
+            ViewBag.Carreras = carreras;
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Actualizar_Carrera(int carreraId, string nombreCarrera, int yearCarrera, List<int> categoriasSeleccionadas)
+        {
+            if (categoriasSeleccionadas == null || categoriasSeleccionadas.Count != 3)
+            {
+                return Json(new { success = false, message = "Selecciona exactamente tres categorías." });
+            }
+
+            // Verificar si las categorías son únicas
+            if (categoriasSeleccionadas.Distinct().Count() != 3)
+            {
+                return Json(new { success = false, message = "Debes seleccionar tres categorías diferentes." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    // Actualizar el nombre y el año de la carrera
+                    string updateCarrera = "UPDATE CARRERA SET nom_carrera = @Nombre, year_carrera = @Year WHERE ID_carrera = @Id";
+                    using (SqlCommand command = new SqlCommand(updateCarrera, connection))
+                    {
+                        command.Parameters.AddWithValue("@Nombre", nombreCarrera);
+                        command.Parameters.AddWithValue("@Year", yearCarrera);
+                        command.Parameters.AddWithValue("@Id", carreraId);
+                        await command.ExecuteNonQueryAsync();
+                    }
+
+                    // Ahora actualizar solo los IDs de las categorías
+                    // Obtener los ID_carr_cat para cada categoría asociada a la carrera
+                    string getCarrCatIds = "SELECT ID_carr_cat, ID_categoria FROM CARR_CAT WHERE ID_carrera = @Id";
+                    var categoriaIds = new List<int>(); // Para almacenar los ID_carr_cat que necesitan ser actualizados
+
+                    using (SqlCommand command = new SqlCommand(getCarrCatIds, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", carreraId);
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                categoriaIds.Add(reader.GetInt32(0)); // ID_carr_cat
+                            }
+                        }
+                    }
+
+                    // Actualizar las categorías con el nuevo ID_categoria
+                    string updateCategorias = @"
+                UPDATE CARR_CAT
+                SET ID_categoria = @CategoriaId
+                WHERE ID_carr_cat = @IdCarrCat";
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        using (SqlCommand command = new SqlCommand(updateCategorias, connection))
+                        {
+                            command.Parameters.AddWithValue("@CategoriaId", categoriasSeleccionadas[i]);
+                            command.Parameters.AddWithValue("@IdCarrCat", categoriaIds[i]); // Actualizamos el ID_carr_cat
+
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+
+                return Json(new { success = true, message = "Carrera actualizada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al actualizar la carrera: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al actualizar la carrera." });
+            }
+        }
+
+
+        [HttpGet]
+        public async Task<IActionResult> CargarDatosCarrera(int id)
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            var resultado = new DatosCarrera();
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Obtener nombre y año de la carrera
+                string queryCarrera = "SELECT nom_carrera, year_carrera FROM CARRERA WHERE ID_carrera = @Id";
+                using (SqlCommand command = new SqlCommand(queryCarrera, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", id);
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            resultado.Nombre = reader.GetString(0);   // Verifica que se está obteniendo el nombre
+                            resultado.Year = reader.GetInt32(1);     // Verifica que se está obteniendo el año
+                        }
+                    }
+                }
+
+                // Obtener categorías asociadas a la carrera seleccionada
+                string queryCategorias = @"
+            SELECT cc.ID_categoria, c.nombre_categoria 
+            FROM CARR_CAT cc 
+            JOIN CATEGORIA c ON cc.ID_categoria = c.ID_categoria 
+            WHERE cc.ID_carrera = @Id";
+                using (SqlCommand command = new SqlCommand(queryCategorias, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", id);
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            resultado.Categorias.Add(new Categoria
+                            {
+                                Id = reader.GetInt32(0),
+                                Nombre = reader.GetString(1)
+                            });
+                        }
+                    }
+                }
+
+                // Obtener todas las categorías disponibles
+                string queryTodasCategorias = "SELECT ID_categoria, nombre_categoria FROM CATEGORIA";
+                using (SqlCommand command = new SqlCommand(queryTodasCategorias, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        resultado.TodasCategorias.Add(new Categoria
+                        {
+                            Id = reader.GetInt32(0),
+                            Nombre = reader.GetString(1)
+                        });
+                    }
+                }
+            }
+
+            // Verifica que resultado contiene todos los valores correctos
+            Console.WriteLine($"Datos de la Carrera: {resultado.Nombre}, {resultado.Year}, Categorías: {resultado.Categorias.Count}");
+
+            return Json(resultado);
+        }
 
 
         public IActionResult Error()
         {
             return View();
         }
+
+        public class DatosCarrera
+        {
+            public string Nombre { get; set; }
+            public int Year { get; set; }
+            public List<Categoria> Categorias { get; set; } = new List<Categoria>();
+            public List<Categoria> TodasCategorias { get; set; } = new List<Categoria>();
+        }
+
+        public class Categoria
+        {
+            public int Id { get; set; }
+            public string Nombre { get; set; }
+        }
+
     }
 }
