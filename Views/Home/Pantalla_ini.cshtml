@@ -134,7 +134,7 @@
     </button>
     <ul class="dropdown-menu" aria-labelledby="gestionCarrerasMenu">
         <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
-        <li><a class="dropdown-item" href="@Url.Action("Baja_Carrera", "Home")">Eliminar Carrera</a></li>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
         <li><a class="dropdown-item" href="@Url.Action("Editar_Carrera", "Home")">Editar Carrera</a></li>
         <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
         <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Carrera</a></li>
