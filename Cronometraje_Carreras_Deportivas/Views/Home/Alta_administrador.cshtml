@@ -2,19 +2,15 @@
     ViewData["Title"] = "Alta de Administrador";
 }
 
-<nav class="navbar navbar-expand-sm header">
-    <div class="container-fluid">
-        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
-             style="max-width: 15%;">
-    </div>
-</nav>
+<h2>Registro de Nuevo Administrador</h2>
+
 <div class="container-fluid d-flex justify-content-center mt-2">
-    <div class="container border border-2 border-black rounded rounded-4 m-0 p-0" style="width: 80%;">
+    <div class="container border border-2 border-black rounded rounded-4 m-0 p-0" style="width: 60%;">
         <div class="cardHeader mbg ps-3 py-2 m-0 rounded-top-4">
-            <h1 style="color: white;">Registro de Nuevo Administrador</h1>
+            <h1>Nuevo usuario</h1>
         </div>
-        <div class="container-fluid py-1">
-            <h4 class="text-center">Ingresa tus credenciales para poder continuar</h4>
+        <div class="container-fluid py-4">
+            <h3 class="text-center">Ingresa tus credenciales para poder continuar</h3>
 
             <!-- Mostrar mensajes de éxito o error -->
             @if (TempData["SuccessMessage"] != null)
@@ -37,28 +33,27 @@
             }
 
             <form asp-action="Alta_administrador" method="post">
-                <div class="row my-1 py-1 px-10">
-                    <label for="usuario" class="col-sm-5 col-lg-4 col-form-label col-form-label-lg text-end">Nuevo Usuario:</label>
-                    <div class="col-sm-7 col-lg-8">
+                <div class="row my-1 py-1 px-5">
+                    <label for="usuario" class="col-sm-2 col-lg-4 col-form-label col-form-label-lg">Nuevo Usuario:</label>
+                    <div class="col-sm-10 col-lg-8">
                         <input type="text" class="form-control form-control-lg" id="usuario" name="usuario" placeholder="Usuario" required>
                     </div>
                 </div>
-                
-                <div class="row my-1 py-1 px-10">
-                    <label for="contrasena" class="col-sm-5 col-lg-4 col-form-label col-form-label-lg text-end">Contraseña:</label>
-                    <div class="col-sm-7 col-lg-8">
+                <div class="row my-1 py-1 px-5">
+                    <label for="contrasena" class="col-sm-2 col-lg-4 col-form-label col-form-label-lg">Contraseña:</label>
+                    <div class="col-sm-10 col-lg-8">
                         <input type="password" class="form-control form-control-lg" id="contrasena" name="contrasena" placeholder="Contraseña" required>
                     </div>
                 </div>
-                <div class="row my-1 py-1 px-10">
-                    <label for="superUsuario" class="col-sm-5 col-lg-4 col-form-label col-form-label-lg text-end">Usuario Super Administrador:</label>
-                    <div class="col-sm-7 col-lg-8">
+                <div class="row my-1 py-1 px-5">
+                    <label for="superUsuario" class="col-sm-2 col-lg-4 col-form-label col-form-label-lg">Usuario Super Administrador:</label>
+                    <div class="col-sm-10 col-lg-8">
                         <input type="text" class="form-control form-control-lg" id="superUsuario" name="superUsuario" placeholder="Usuario Super Admin" required>
                     </div>
                 </div>
-                <div class="row my-1 py-1 px-10">
-                    <label for="superContrasena" class="col-sm-5 col-lg-4 col-form-label col-form-label-lg text-end">Contraseña Super Administrador:</label>
-                    <div class="col-sm-7 col-lg-8">
+                <div class="row my-1 py-1 px-5">
+                    <label for="superContrasena" class="col-sm-2 col-lg-4 col-form-label col-form-label-lg">Contraseña Super Administrador:</label>
+                    <div class="col-sm-10 col-lg-8">
                         <input type="password" class="form-control form-control-lg" id="superContrasena" name="superContrasena" placeholder="Contraseña Super Admin" required>
                     </div>
                 </div>

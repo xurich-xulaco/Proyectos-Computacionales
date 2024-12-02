@@ -1,0 +1,93 @@
+﻿@{
+    ViewData["Title"] = "Eliminar Carrera";
+}
+
+<div class="container mt-5">
+    <h2 class="text-center">Eliminar Carrera</h2>
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Cambié la columna a 8 para hacer la ventana más ancha -->
+            <form id="eliminarCarreraForm" method="post" action="/Home/Eliminar_Carrera">
+                <div class="form-group mb-3">
+                    <label for="carreraSelect" class="form-label"><strong>Selecciona una carrera:</strong></label>
+                    <select id="carreraSelect" name="carreraId" class="form-select" required>
+                        <option value="">Selecciona una carrera</option>
+                        @foreach (var carrera in ViewBag.Carreras as List<dynamic>)
+                        {
+                            <option value="@carrera.Id">@carrera.Descripcion</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <!-- Botón Cancelar -->
+                    <a href="/Home/Pantalla_ini" class="btn btn-primary">Cancelar</a>
+
+                    <!-- Botón Eliminar -->
+                    <button type="button" id="eliminarCarreraBtn" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $(document).ready(function () {
+            // Confirmación y eliminación
+            $('#eliminarCarreraBtn').click(function () {
+                const carreraId = $('#carreraSelect').val();
+                const carreraText = $('#carreraSelect option:selected').text();
+
+                if (!carreraId) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Advertencia',
+                        text: 'Por favor, selecciona una carrera para eliminar.',
+                    });
+                    return;
+                }
+
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: `Estás a punto de eliminar la carrera: ${carreraText}. Esta acción no se puede deshacer.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonText: 'Eliminar',
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Hacer la solicitud de eliminación
+                        $.ajax({
+                            url: '/Home/Eliminar_Carrera',
+                            type: 'POST',
+                            data: { carreraId: carreraId },
+                            success: function (response) {
+                                if (response.success) {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: '¡Eliminación exitosa!',
+                                        text: 'La carrera ha sido eliminada correctamente.',
+                                    }).then(() => {
+                                        // Redirigir a la pantalla inicial
+                                        window.location.href = '/Home/Pantalla_ini';
+                                    });
+                                }
+                            },
+                            error: function () {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: 'Hubo un problema al eliminar la carrera. Intenta nuevamente.',
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+}

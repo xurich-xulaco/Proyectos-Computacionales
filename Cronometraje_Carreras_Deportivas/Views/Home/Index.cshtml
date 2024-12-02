@@ -8,7 +8,6 @@
 }
 
 
-
 <body>
     <nav class="navbar navbar-expand-sm header">
         <div class="container-fluid">
@@ -28,7 +27,7 @@
 
                 <!-- Formulario de autenticación -->
                 <form asp-action="Index" method="post">
-                    <div class="row" style="align-items: center;">
+                    <div class="row">
                         <div class="col-1"></div>
                         <div class="col-3">
                             <h3>Usuario:</h3>
@@ -38,7 +37,7 @@
                         </div>
                     </div>
                     <br>
-                    <div class="row" style="align-items: center;">
+                    <div class="row">
                         <div class="col-1"></div>
                         <div class="col-3">
                             <h3>Contraseña:</h3>
@@ -47,26 +46,24 @@
                             <input type="password" class="form-control" name="contrasena" placeholder="Contraseña" required>
                         </div>
                     </div>
-                   
+                    <br>
                     <div class="row">
                         <div class="col-9">
-
+                            <a href="@Url.Action("Alta_administrador", "Home")">¿Quieres dar de alta un nuevo usuario? Haz clic aquí.</a>
+                            <br><br>
+                            <a href="@Url.Action("Baja_administrador", "Home")">¿Quieres dar de baja un usuario existente? Haz clic aquí.</a>
                         </div>
                         <div class="col-3">
-                           
+                            <br>
                             <button type="submit" class="btn btn-outline-light" style="background-color:#004A98;">
                                 Iniciar sesión
                             </button>
                         </div>
                     </div>
                 </form>
-                <a href="@Url.Action("Alta_administrador", "Home")">¿Quieres dar de alta un nuevo usuario? Haz clic aquí.</a>
-                <br><br>
-                <a href="@Url.Action("Baja_administrador", "Home")">¿Quieres dar de baja un usuario existente? Haz clic aquí.</a>
                 <!-- Fin del formulario -->
             </div>
         </div>
     </div>
 </body>
-
 
