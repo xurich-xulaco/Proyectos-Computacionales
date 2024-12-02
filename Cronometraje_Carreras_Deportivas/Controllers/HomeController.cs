@@ -118,7 +118,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del super administrador (sin hashing)
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -170,7 +170,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del superadministrador
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -211,12 +211,12 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> BuscarCorredores(int? yearCarrera, int? ediCarrera, string categoria)
+        public async Task<IActionResult> BuscarCorredores(int? yearCarrera, int? ediCarrera, string categoria, string nombreCorredor)
         {
             if (!yearCarrera.HasValue || !ediCarrera.HasValue || string.IsNullOrEmpty(categoria))
             {
                 ViewBag.Error = "Por favor selecciona el año, edición y categoría.";
-                await InicializarAnios();
+                await InicializarAnios(); // Cargar los años para el selector
                 return View("Pantalla_ini");
             }
 
@@ -230,128 +230,57 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     string query = @"
-            WITH TiemposCorredor AS (
+                WITH TiemposCorredor AS (
                 SELECT 
                     folio_chip,
                     tiempo_registrado,
                     ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
                 FROM dbo.Tiempo
+            ),
+            Posiciones AS (
+                SELECT 
+                    RANK() OVER (ORDER BY 
+                        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+                    ) AS Posicion,
+                    v.num_corredor AS NumCorredor, 
+                    c.nom_corredor AS Nombre,
+                    c.apP_corredor AS ApellidoPaterno,
+                    c.apM_corredor AS ApellidoMaterno,
+                    COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+                    COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+                    COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+                    CONVERT(TIME, DATEADD(SECOND, 
+                        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+                        0
+                    )) AS TiempoTotal
+                FROM CARRERA ca
+                JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+                JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
+                LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+                LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+                LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+                WHERE ca.year_carrera = @YearCarrera
+                  AND ca.edi_carrera = @EdiCarrera
+                  AND cat.nombre_categoria = @Categoria
             )
-            SELECT 
-                RANK() OVER (ORDER BY 
-                    DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                    DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                    DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
-                ) AS Posicion,
-                v.num_corredor AS NumCorredor, 
-                c.nom_corredor AS Nombre,
-                COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
-                COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
-                COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-                CONVERT(TIME, DATEADD(SECOND, 
-                    DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                    DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                    DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
-                    0
-                )) AS TiempoTotal
-            FROM CARRERA ca
-            JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-            JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
-            JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
-            LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-            LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-            LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
-            WHERE ca.year_carrera = @YearCarrera
-              AND ca.edi_carrera = @EdiCarrera
-              AND cat.nombre_categoria = @Categoria
-            ORDER BY Posicion;";
-
+            SELECT Posicion, NumCorredor, Nombre, T1, T2, T3, TiempoTotal
+            FROM Posiciones
+            WHERE @NombreCorredor IS NULL 
+               OR CONCAT(Nombre, ' ', ApellidoPaterno, ' ', ApellidoMaterno) LIKE @NombreCorredor
+            ORDER BY Posicion;
+                        ";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@YearCarrera", yearCarrera.Value);
                         command.Parameters.AddWithValue("@EdiCarrera", ediCarrera.Value);
                         command.Parameters.AddWithValue("@Categoria", categoria);
-
-                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                var fila = new Dictionary<string, object>
-                                {
-                                    { "Posicion", reader.GetInt64(0) }, // Leer como Int64 si la base de datos usa BIGINT
-                                    { "NumCorredor", reader.GetInt32(1) },
-                                    { "NombreCorredor", reader.GetString(2) },
-                                    { "T1", reader.IsDBNull(3) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(3)) },
-                                    { "T2", reader.IsDBNull(4) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(4)) },
-                                    { "T3", reader.IsDBNull(5) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(5)) },
-                                    { "TiempoTotal", reader.IsDBNull(6) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(6)) }
-                                };
-                                resultados.Add(fila);
-                            }
-                        }
-
-
-                    }
-                }
-
-                ViewBag.ResultadosBusqueda = resultados;
-
-                // Guardar las selecciones para mantener los valores en el formulario
-                ViewBag.SelectedYear = yearCarrera;
-                ViewBag.SelectedEdition = ediCarrera;
-                ViewBag.SelectedCategory = categoria;
-
-                await InicializarAnios(); // Cargar los años para el selector
-                return View("Pantalla_ini");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al buscar corredores: {ex.Message}");
-                ViewBag.Error = "Hubo un error al realizar la búsqueda. Inténtalo de nuevo más tarde.";
-                await InicializarAnios();
-                return View("Pantalla_ini");
-            }
-        }
-        private string FormatearTiempo(TimeSpan tiempo)
-        {
-            return $"{(int)tiempo.TotalHours:D2}:{tiempo.Minutes:D2}:{tiempo.Seconds:D2}.{tiempo.Milliseconds:D3}";
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> BuscarYAgregarCorredor(string nombreCorredor)
-        {
-            if (string.IsNullOrEmpty(nombreCorredor))
-            {
-                ViewBag.Error = "Por favor, proporciona un nombre o parte del nombre del corredor.";
-                await InicializarAnios(); // Cargar los años para el selector
-                return View("Pantalla_ini");
-            }
-
-            List<Dictionary<string, object>> resultados = new List<Dictionary<string, object>>();
-
-            try
-            {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    string query = @"
-                SELECT 
-                    c.num_corredor AS NumCorredor,
-                    c.nom_corredor AS Nombre,
-                    c.apP_corredor AS ApellidoPaterno,
-                    c.apM_corredor AS ApellidoMaterno
-                FROM CORREDOR c
-                WHERE c.nom_corredor LIKE @NombreCorredor
-                   OR c.apP_corredor LIKE @NombreCorredor
-                   OR c.apM_corredor LIKE @NombreCorredor
-                ORDER BY c.num_corredor;";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@NombreCorredor", $"%{nombreCorredor}%");
+                        command.Parameters.AddWithValue("@NombreCorredor", string.IsNullOrEmpty(nombreCorredor) ? DBNull.Value : (object)$"%{nombreCorredor}%");
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
@@ -359,10 +288,13 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                             {
                                 var fila = new Dictionary<string, object>
                         {
-                            { "NumCorredor", reader.GetInt32(0) },
-                            { "Nombre", reader.GetString(1) },
-                            { "ApellidoPaterno", reader.IsDBNull(2) ? "" : reader.GetString(2) },
-                            { "ApellidoMaterno", reader.IsDBNull(3) ? "" : reader.GetString(3) }
+                            { "Posicion", reader.GetInt64(0) },
+                            { "NumCorredor", reader.GetInt32(1) },
+                            { "Nombre", reader.GetString(2) },
+                            { "T1", reader.IsDBNull(3) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(3)) },
+                            { "T2", reader.IsDBNull(4) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(4)) },
+                            { "T3", reader.IsDBNull(5) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(5)) },
+                            { "TiempoTotal", reader.IsDBNull(6) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(6)) }
                         };
                                 resultados.Add(fila);
                             }
@@ -371,7 +303,11 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 }
 
                 ViewBag.ResultadosBusqueda = resultados;
-                ViewBag.NombreBuscado = nombreCorredor; // Para mantener el valor ingresado en la vista
+                ViewBag.SelectedYear = yearCarrera;
+                ViewBag.SelectedEdition = ediCarrera;
+                ViewBag.SelectedCategory = categoria;
+                ViewBag.NombreBuscado = nombreCorredor;
+
                 await InicializarAnios(); // Cargar los años para el selector
                 return View("Pantalla_ini");
             }
@@ -384,6 +320,10 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
+        private string FormatearTiempo(TimeSpan tiempo)
+        {
+            return $"{(int)tiempo.TotalHours:D2}:{tiempo.Minutes:D2}:{tiempo.Seconds:D2}.{tiempo.Milliseconds:D3}";
+        }
 
         private async Task InicializarAnios()
         {
