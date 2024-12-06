@@ -6,20 +6,50 @@
     <h2>Crear Corredor</h2>
 
     <form id="crear-corredor-form" class="form-container">
+        <!-- Fila 1: Nombres, Apellido Paterno, Apellido Materno -->
         <div class="form-row">
-            <input type="text" id="Nombre" name="Nombre" placeholder="Nombres" required />
-            <input type="text" id="Apaterno" name="Apaterno" placeholder="Apellido Paterno" required />
-            <input type="text" id="Amaterno" name="Amaterno" placeholder="Apellido Materno" required />
+            <div class="form-group col-md-4">
+                <label for="Nombre">Nombre <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Nombre" name="Nombre" required />
+            </div>
+            <div class="form-group col-md-4">
+                <label for="Apaterno">Apellido Paterno <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Apaterno" name="Apaterno" required />
+            </div>
+            <div class="form-group col-md-4">
+                <label for="Amaterno">Apellido Materno (Opcional)</label>
+                <input type="text" class="form-control" id="Amaterno" name="Amaterno" placeholder="Opcional" />
+            </div>
         </div>
+
+        <!-- Fila 2: Fecha de Nacimiento -->
         <div class="form-row">
-            <input type="date" id="Fnacimiento" name="Fnacimiento" placeholder="Fecha de Nacimiento" required />
+            <div class="form-group col-md-12">
+                <label for="Fnacimiento">Fecha de Nacimiento <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="Fnacimiento" name="Fnacimiento" required />
+            </div>
         </div>
+
+        <!-- Fila 3: País y Teléfono -->
         <div class="form-row">
-            <input type="email" id="Correo" name="Correo" placeholder="Correo" />
+            <div class="form-group col-md-6">
+                <label for="Pais">País <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Pais" name="Pais" required />
+            </div>
+            <div class="form-group col-md-6">
+                <label for="Telefono">Teléfono (Opcional)</label>
+                <input type="text" class="form-control" id="Telefono" name="Telefono" placeholder="Opcional" />
+            </div>
         </div>
+
+        <!-- Fila 4: Correo -->
         <div class="form-row">
-            <input type="text" id="Pais" name="Pais" placeholder="País" required />
+            <div class="form-group col-md-12">
+                <label for="Correo">Correo Electrónico (Opcional)</label>
+                <input type="email" class="form-control" id="Correo" name="Correo" placeholder="Opcional" />
+            </div>
         </div>
+
         <div class="form-row">
             <select id="Sexo" name="Sexo" required>
                 <option value="" disabled selected>Seleccione Sexo</option>

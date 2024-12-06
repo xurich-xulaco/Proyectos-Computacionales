@@ -534,7 +534,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Crear_Corredor(string Nombre, string Apaterno, string Amaterno, DateTime Fnacimiento, string Sexo, string Correo, string Pais, int CarreraId, string CategoriaNombre)
+        public async Task<IActionResult> Crear_Corredor(string Nombre, string Apaterno, string? Amaterno, DateTime Fnacimiento, string Sexo, string? Correo, string Pais, string? Telefono, int CarreraId, string CategoriaNombre)
         {
             try
             {
@@ -546,16 +546,17 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
                     // Verificar si el corredor ya existe
                     string checkSql = @"
-            SELECT COUNT(*) 
-            FROM CORREDOR 
-            WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
-              AND apM_corredor = @Amaterno AND f_corredor = @Fnacimiento";
+                SELECT COUNT(*) 
+                FROM CORREDOR 
+                WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
+                  AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
+                  AND f_corredor = @Fnacimiento";
 
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@Nombre", Nombre);
                         checkCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        checkCommand.Parameters.AddWithValue("@Amaterno", Amaterno);
+                        checkCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
                         checkCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
 
                         if ((int)await checkCommand.ExecuteScalarAsync() > 0)
@@ -566,30 +567,45 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
                     // Insertar nuevo corredor
                     string insertCorredorSql = @"
-            INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
-                                  f_corredor, sex_corredor, c_corredor, pais) 
-            OUTPUT INSERTED.ID_corredor
-            VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
+                INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
+                                      f_corredor, sex_corredor, c_corredor, pais) 
+                OUTPUT INSERTED.ID_corredor
+                VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
 
                     byte[] corredorId;
                     using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection))
                     {
                         insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
                         insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        insertCommand.Parameters.AddWithValue("@Amaterno", Amaterno);
+                        insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
                         insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
                         insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
-                        insertCommand.Parameters.AddWithValue("@Correo", Correo ?? (object)DBNull.Value);
+                        insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
                         insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
 
                         corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
                     }
 
-                    // Buscar el ID_categoria basado en el nombre de la categoría
+                    // Insertar número de teléfono si se proporciona
+                    if (!string.IsNullOrEmpty(Telefono))
+                    {
+                        string insertTelefonoSql = @"
+                    INSERT INTO TELEFONO (numero, ID_corredor)
+                    VALUES (@Numero, @IDCorredor)";
+
+                        using (SqlCommand telefonoCommand = new SqlCommand(insertTelefonoSql, connection))
+                        {
+                            telefonoCommand.Parameters.AddWithValue("@Numero", Telefono);
+                            telefonoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+
+                            await telefonoCommand.ExecuteNonQueryAsync();
+                        }
+                    }
+
                     string getCategoriaSql = @"
-            SELECT ID_categoria 
-            FROM CATEGORIA 
-            WHERE nombre_categoria = @CategoriaNombre";
+                SELECT ID_categoria 
+                FROM CATEGORIA 
+                WHERE nombre_categoria = @CategoriaNombre";
 
                     int? idCategoria = null;
                     using (SqlCommand getCategoriaCommand = new SqlCommand(getCategoriaSql, connection))
@@ -604,11 +620,10 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         return Json(new { success = false, message = "Categoría seleccionada no válida." });
                     }
 
-                    // Verificar ID_carr_cat válido
                     string getCarrCatSql = @"
-            SELECT ID_carr_cat 
-            FROM CARR_CAT 
-            WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
+                SELECT ID_carr_cat 
+                FROM CARR_CAT 
+                WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
 
                     int? idCarrCat = null;
                     using (SqlCommand getCarrCatCommand = new SqlCommand(getCarrCatSql, connection))
@@ -624,14 +639,12 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
                     }
 
-                    // Asociar al corredor con la carrera y categoría
                     string insertVinculoSql = @"
-                        INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
-                        VALUES (@CorredorId, 
-                                @IDCarrCat,
-                                (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
-                                 'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
-
+                INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
+                VALUES (@CorredorId, 
+                        @IDCarrCat,
+                        (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
+                        'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
 
                     using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection))
                     {
@@ -651,6 +664,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return Json(new { success = false, message = "Ocurrió un error al crear el corredor." });
             }
         }
+
 
         [HttpGet]
         public async Task<IActionResult> ObtenerCategoriasPorCarrera_Corredor(int carreraId)
