@@ -1,97 +1,206 @@
-﻿<div class="modal-container" style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: rgba(0, 0, 0, 0.05);">
-    <div class="modal-content" style="width: 600px; padding: 20px; border-radius: 8px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);">
-        <h2 style="text-align: center; margin-bottom: 20px;">Crear Nuevo Corredor</h2>
-        <form id="crearCorredorForm">
-            <div style="margin-bottom: 15px;">
-                <label for="Nombre">Nombre</label>
-                <input type="text" id="Nombre" name="Nombre" class="form-control" required />
+﻿@{
+    ViewData["Title"] = "Crear Corredor";
+}
+
+<div class="form-wrapper">
+    <h2>Crear Corredor</h2>
+
+    <form id="crear-corredor-form" class="form-container">
+        <!-- Fila 1: Nombres, Apellido Paterno, Apellido Materno -->
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="Nombre">Nombre <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Nombre" name="Nombre" required />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="Apaterno">Apellido Paterno</label>
-                <input type="text" id="Apaterno" name="Apaterno" class="form-control" required />
+            <div class="form-group col-md-4">
+                <label for="Apaterno">Apellido Paterno <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Apaterno" name="Apaterno" required />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="Amaterno">Apellido Materno</label>
-                <input type="text" id="Amaterno" name="Amaterno" class="form-control" required />
+            <div class="form-group col-md-4">
+                <label for="Amaterno">Apellido Materno (Opcional)</label>
+                <input type="text" class="form-control" id="Amaterno" name="Amaterno" placeholder="Opcional" />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="Fnacimiento">Fecha de Nacimiento</label>
-                <input type="date" id="Fnacimiento" name="Fnacimiento" class="form-control" required />
+        </div>
+
+        <!-- Fila 2: Fecha de Nacimiento -->
+        <div class="form-row">
+            <div class="form-group col-md-12">
+                <label for="Fnacimiento">Fecha de Nacimiento <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="Fnacimiento" name="Fnacimiento" required />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="sexo">Sexo</label>
-                <select id="sexo" name="sexo" class="form-control" required>
-                    <option value="">Seleccionar</option>
-                    <option value="Masculino">Masculino</option>
-                    <option value="Femenino">Femenino</option>
-                </select>
+        </div>
+
+        <!-- Fila 3: País y Teléfono -->
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="Pais">País <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Pais" name="Pais" required />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="correo">Correo Electrónico</label>
-                <input type="email" id="correo" name="correo" class="form-control" required />
+            <div class="form-group col-md-6">
+                <label for="Telefono">Teléfono (Opcional)</label>
+                <input type="text" class="form-control" id="Telefono" name="Telefono" placeholder="Opcional" />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="pais">País</label>
-                <input type="text" id="pais" name="pais" class="form-control" required />
+        </div>
+
+        <!-- Fila 4: Correo -->
+        <div class="form-row">
+            <div class="form-group col-md-12">
+                <label for="Correo">Correo Electrónico (Opcional)</label>
+                <input type="email" class="form-control" id="Correo" name="Correo" placeholder="Opcional" />
             </div>
-            <div style="margin-bottom: 15px;">
-                <label for="telefono">Número Telefónico</label>
-                <input type="tel" id="telefono" name="telefono" class="form-control" required />
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-                <button type="button" class="btn btn-danger" onclick="window.location.href='@Url.Action("Pantalla_ini", "Home")'">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Crear</button>
-            </div>
-        </form>
-    </div>
+        </div>
+
+        <div class="form-row">
+            <select id="Sexo" name="Sexo" required>
+                <option value="" disabled selected>Seleccione Sexo</option>
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <select id="CarreraId" name="CarreraId" required>
+                <option value="" disabled selected>Seleccione una Carrera</option>
+                @foreach (var carrera in ViewBag.Carreras)
+                {
+                    <option value="@carrera.Value">@carrera.Text</option>
+                }
+            </select>
+            <select id="CategoriaId" name="CategoriaNombre" required>
+                <option value="" disabled selected>Seleccione una Categoría</option>
+            </select>
+        </div>
+        <div class="form-row buttons-row">
+            <button type="button" id="cancelar-btn" class="btn btn-cancel">Cancelar</button>
+            <button type="button" id="crear-btn" class="btn btn-create">Crear</button>
+        </div>
+    </form>
 </div>
 
-@section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        document.getElementById('crearCorredorForm').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const formData = new FormData(this);
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-            const sexoSelect = document.getElementById('sexo');
-            const sexoValue = sexoSelect.value;
-            if (sexoValue === 'Masculino') {
-                formData.set('sexo', 'M');
-            } else if (sexoValue === 'Femenino') {
-                formData.set('sexo', 'F');
-            }
-
-            try {
-                const response = await fetch('@Url.Action("Alta_Corredor", "Home")', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Éxito',
-                        text: result.message,
-                        timer: 3000,
-                        showConfirmButton: false
-                    }).then(() => {
-                        window.location.href = '@Url.Action("Pantalla_ini", "Home")';
+<script>
+    $(document).ready(function () {
+        // Cargar categorías dinámicamente
+        $("#CarreraId").change(function () {
+            const carreraId = $(this).val();
+            if (carreraId) {
+                $.getJSON(`/Home/ObtenerCategoriasPorCarrera_Corredor?carreraId=${carreraId}`, function (categorias) {
+                    const categoriaSelect = $("#CategoriaId");
+                    categoriaSelect.empty().append(new Option("Seleccione una Categoría", ""));
+                    categorias.forEach(categoria => {
+                        categoriaSelect.append(new Option(categoria, categoria));
                     });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: result.message
-                    });
-                }
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Ocurrió un error inesperado.'
                 });
             }
         });
-    </script>
-}
+
+        // Manejo del botón "Cancelar"
+        $("#cancelar-btn").click(function () {
+            window.location.href = "/Home/Pantalla_ini";
+        });
+
+        // Manejo del botón "Crear"
+           $("#crear-btn").click(function () {
+        const formData = $("#crear-corredor-form").serialize();
+        $.post("/Home/Crear_Corredor", formData, function (response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: "success",
+                    title: "Éxito",
+                    text: response.message,
+                }).then(() => {
+                    window.location.href = "/Home/Pantalla_ini";
+                });
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: response.message,
+                });
+            }
+        }).fail(function () {
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "Ocurrió un error inesperado.",
+            });
+        });
+    });
+
+    });
+</script>
+
+<style>
+    /* Estilo general */
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f7f7f7;
+    }
+
+    .form-wrapper {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-width: 800px; /* Ancho ampliado */
+        width: 100%;
+    }
+
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .form-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 10px;
+    }
+
+    input, select {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .buttons-row {
+        justify-content: center;
+    }
+
+    .btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #fff;
+        font-weight: bold;
+        text-align: center;
+        flex: 1;
+    }
+
+    .btn-cancel {
+        background-color: #e74c3c;
+    }
+
+    .btn-create {
+        background-color: #3498db;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+</style>
