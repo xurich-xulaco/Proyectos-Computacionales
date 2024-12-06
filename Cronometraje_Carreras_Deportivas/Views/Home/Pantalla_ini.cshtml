@@ -82,7 +82,60 @@
     {
         <p>No se encontraron resultados para los criterios de búsqueda.</p>
     }
+
+
 </div>
+
+<div class="dropdown mt-3">
+    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCorredorMenu" data-bs-toggle="dropdown" aria-expanded="false">
+        Gestión de Corredores
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCorredorMenu">
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Corredor", "Home")'">Editar Corredor</button>
+        <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
+        <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Corredor</a></li>
+    </ul>
+</div>
+
+<div class="dropdown mt-3">
+    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCarrerasMenu" data-bs-toggle="dropdown" aria-expanded="false">
+        Gestión de Carreras
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCarrerasMenu">
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
+        <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
+        <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Carrera</a></li>
+    </ul>
+</div>
+
+<!-- Modal Eliminar Carrera -->
+<div class="modal fade" id="modalEliminarCarrera" tabindex="-1" aria-labelledby="modalEliminarCarreraLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEliminarCarreraLabel">Eliminar Carrera</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="carreraSeleccionada" class="form-label">Selecciona una carrera</label>
+                    <select class="form-control" id="carreraSeleccionada" onchange="cargarParametrosCarrera()">
+                        <option value="">Seleccione una carrera</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="eliminarCarrera()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <script>
@@ -129,55 +182,6 @@
         }
     });
 </script>
-<div class="dropdown mt-3">
-    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCarrerasMenu" data-bs-toggle="dropdown" aria-expanded="false">
-        Gestión de Carreras
-    </button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCarrerasMenu">
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
-        <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
-        <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Carrera</a></li>
-    </ul>
-</div>
-<div class="dropdown mt-3">
-    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCorredoresMenu" data-bs-toggle="dropdown" aria-expanded="false">
-        Gestión de Corredores
-    </button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCorredoresMenu">
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo corredor</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Elimina corredor</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Modificar corredor</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Importar corredores</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Exportar corredores</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Generar reporte de corredor</button>
-    </ul>
-</div>
-
-<!-- Modal Eliminar Carrera -->
-<div class="modal fade" id="modalEliminarCarrera" tabindex="-1" aria-labelledby="modalEliminarCarreraLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalEliminarCarreraLabel">Eliminar Carrera</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="carreraSeleccionada" class="form-label">Selecciona una carrera</label>
-                    <select class="form-control" id="carreraSeleccionada" onchange="cargarParametrosCarrera()">
-                        <option value="">Seleccione una carrera</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="eliminarCarrera()">Eliminar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
