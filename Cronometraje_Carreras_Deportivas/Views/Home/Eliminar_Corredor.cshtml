@@ -1,0 +1,171 @@
+﻿@model dynamic
+@{
+    ViewData["Title"] = "Eliminar Corredor";
+}
+
+<div class="container">
+    <h2>Eliminar Corredor</h2>
+
+    <form id="filtro-form">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="yearCarrera" class="form-label">Año</label>
+                <select class="form-select" id="yearCarrera" name="yearCarrera" required>
+                    <option value="" disabled selected>Seleccione un año</option>
+                    @foreach (var year in ViewBag.Years)
+                    {
+                        <option value="@year">@year</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="ediCarrera" class="form-label">Edición</label>
+                <select class="form-select" id="ediCarrera" name="ediCarrera" disabled required>
+                    <option value="" disabled selected>Seleccione una edición</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="categoria" class="form-label">Categoría</label>
+                <select class="form-select" id="categoria" name="categoria" disabled required>
+                    <option value="" disabled selected>Seleccione una categoría</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="numeroCorredor" class="form-label">Número del Corredor</label>
+                <input type="number" class="form-control" id="numeroCorredor" name="numeroCorredor" disabled required />
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary mt-3" id="buscar-corredor-btn" disabled>Buscar</button>
+    </form>
+
+    <div id="detalles-corredor" style="display: none; margin-top: 20px;">
+        <h3>Detalles del Corredor</h3>
+        <div class="row">
+            <div class="col-md-4">
+                <p><strong>Nombre:</strong></p>
+                <input type="text" class="form-control" id="nombreCorredor" readonly />
+            </div>
+            <div class="col-md-4">
+                <p><strong>Apellido Paterno:</strong></p>
+                <input type="text" class="form-control" id="apPaterno" readonly />
+            </div>
+            <div class="col-md-4">
+                <p><strong>Apellido Materno:</strong></p>
+                <input type="text" class="form-control" id="apMaterno" readonly />
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <p><strong>Fecha de Nacimiento:</strong></p>
+                <input type="text" class="form-control" id="fechaNacimiento" readonly />
+            </div>
+            <div class="col-md-4">
+                <p><strong>Sexo:</strong></p>
+                <input type="text" class="form-control" id="sexoCorredor" readonly />
+            </div>
+            <div class="col-md-4">
+                <p><strong>País:</strong></p>
+                <input type="text" class="form-control" id="paisCorredor" readonly />
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <p><strong>Correo:</strong></p>
+                <input type="text" class="form-control" id="correoCorredor" readonly />
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <button type="button" class="btn btn-secondary" id="cancelar-btn">Cancelar</button>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-danger" id="eliminar-corredor-btn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Cargar ediciones al seleccionar un año
+        document.getElementById('yearCarrera').addEventListener('change', function () {
+            const year = this.value;
+            fetch(`/Home/CargarEdiciones?yearCarrera=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ediCarrera = document.getElementById('ediCarrera');
+                    ediCarrera.innerHTML = '<option value="" disabled selected>Seleccione una edición</option>';
+                    data.forEach(ed => ediCarrera.innerHTML += `<option value="${ed}">${ed}</option>`);
+                    ediCarrera.disabled = false;
+                });
+        });
+
+        // Cargar categorías al seleccionar una edición
+        document.getElementById('ediCarrera').addEventListener('change', function () {
+            const year = document.getElementById('yearCarrera').value;
+            const edition = this.value;
+            fetch(`/Home/CargarCategorias?yearCarrera=${year}&ediCarrera=${edition}`)
+                .then(response => response.json())
+                .then(data => {
+                    const categoria = document.getElementById('categoria');
+                    categoria.innerHTML = '<option value="" disabled selected>Seleccione una categoría</option>';
+                    data.forEach(cat => categoria.innerHTML += `<option value="${cat}">${cat}</option>`);
+                    categoria.disabled = false;
+                });
+        });
+
+        // Habilitar búsqueda por número
+        document.getElementById('categoria').addEventListener('change', function () {
+            document.getElementById('numeroCorredor').disabled = false;
+            document.getElementById('buscar-corredor-btn').disabled = false;
+        });
+
+        // Buscar corredor
+        document.getElementById('buscar-corredor-btn').addEventListener('click', function () {
+            const numero = document.getElementById('numeroCorredor').value;
+            fetch(`/Home/ObtenerDetalleCorredorPorNumero?numero=${numero}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('detalles-corredor').style.display = 'block';
+                        document.getElementById('nombreCorredor').value = data.Nombre;
+                        document.getElementById('apPaterno').value = data.ApellidoPaterno;
+                        document.getElementById('apMaterno').value = data.ApellidoMaterno;
+                        document.getElementById('fechaNacimiento').value = data.FechaNacimiento;
+                        document.getElementById('sexoCorredor').value = data.Sexo;
+                        document.getElementById('paisCorredor').value = data.Pais;
+                        document.getElementById('correoCorredor').value = data.Correo;
+                        document.getElementById('eliminar-corredor-btn').dataset.numero = numero;
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(() => Swal.fire('Error', 'Ocurrió un error al buscar el corredor.', 'error'));
+        });
+
+        // Eliminar corredor
+        document.getElementById('eliminar-corredor-btn').addEventListener('click', function () {
+            const numero = this.dataset.numero;
+            fetch('/Home/EliminarCorredor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numero })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire('Éxito', data.message, 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(() => Swal.fire('Error', 'Ocurrió un error al eliminar el corredor.', 'error'));
+        });
+
+        // Cancelar
+        document.getElementById('cancelar-btn').addEventListener('click', function () {
+            location.reload();
+        });
+    </script>
+}
