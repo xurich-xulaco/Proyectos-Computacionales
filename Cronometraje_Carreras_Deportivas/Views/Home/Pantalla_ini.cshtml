@@ -2,8 +2,17 @@
     ViewBag.Title = "Pantalla Inicial";
 }
 
-<h2>Buscar Corredores</h2>
+<nav class="navbar navbar-expand-sm  header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+        <div class="rounded-pill">
+            <h4>tomas tapia</h4>
+            <button class="btn btn-outline-light"><a href="iniciar-sesion.html">Cerrar sesión </a> </button>
 
+        </div>
+    </div>
+</nav>
+<br>
 <form id="searchForm" method="post" action="@Url.Action("BuscarCorredores", "Home")">
     <!-- Formulario en una línea con distribución de dos mitades -->
     <div class="d-flex justify-content-between">
@@ -46,142 +55,172 @@
     <div class="alert alert-danger">@ViewBag.Error</div>
 }
 
-<!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
-<div id="resultTable" class="mt-4" style="width: 50%; margin: auto;">
-    @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
-    {
-        <table>
-            <thead>
-                <tr>
-                    <th>Posición</th>
-                    <th>Número</th>
-                    <th>Nombre</th>
-                    <th>T1</th>
-                    <th>T2</th>
-                    <th>T3</th>
-                    <th>Tiempo Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var corredor in ViewBag.ResultadosBusqueda)
-                {
+
+<div class="row">
+    <!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
+    <div class="col-6 ">
+        <div id="resultTable" class="mt-4" style=" margin: auto;">
+
+            <table class="table table-striped">
+                <thead>
                     <tr>
-                        <td>@corredor["Posicion"]</td>
-                        <td>@corredor["NumCorredor"]</td>
-                        <td>@corredor["Nombre"]</td>
-                        <td>@corredor["T1"]</td>
-                        <td>@corredor["T2"]</td>
-                        <td>@corredor["T3"]</td>
-                        <td>@corredor["TiempoTotal"]</td>
+                        <th>Posición</th>
+                        <th>Número</th>
+                        <th>Nombre</th>
+                        <th>T1</th>
+                        <th>T2</th>
+                        <th>T3</th>
+                        <th>Tiempo Total</th>
                     </tr>
+                </thead>
+                @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
+                {
+                    <tbody>
+                        @foreach (var corredor in ViewBag.ResultadosBusqueda)
+                        {
+                            <tr>
+                                <td>@corredor["Posicion"]</td>
+                                <td>@corredor["NumCorredor"]</td>
+                                <td>@corredor["Nombre"]</td>
+                                <td>@corredor["T1"]</td>
+                                <td>@corredor["T2"]</td>
+                                <td>@corredor["T3"]</td>
+                                <td>@corredor["TiempoTotal"]</td>
+                            </tr>
+                        }
+                    </tbody>
                 }
-            </tbody>
-        </table>
-    }
-    else if (ViewBag.ResultadosBusqueda != null)
-    {
-        <p>No se encontraron resultados para los criterios de búsqueda.</p>
-    }
+                else if (ViewBag.ResultadosBusqueda != null)
+                {
+                    <p>No se encontraron resultados para los criterios de búsqueda.</p>
+                }
+            </table>
 
+        </div>
+    </div>
 
-</div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        // Cuando cambia el año seleccionado
+        $('#yearDropdown').change(function () {
+            var year = $(this).val();
+            if (year) {
+                // Solicitar ediciones para el año seleccionado
+                $.getJSON('/Home/CargarEdiciones', { yearCarrera: year }, function (data) {
+                    $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>');
+                    $.each(data, function (i, item) {
+                        $('#edicionDropdown').append($('<option>', {
+                            value: item,
+                            text: item
+                        }));
+                    });
+                    $('#edicionDropdown').prop('disabled', false);
+                    $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+                });
+            } else {
+                $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>').prop('disabled', true);
+                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+            }
+        });
 
-<div class="dropdown mt-3">
-    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCorredorMenu" data-bs-toggle="dropdown" aria-expanded="false">
-        Gestión de Corredores
-    </button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCorredorMenu">
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Corredor", "Home")'">Editar Corredor</button>
-        <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
-        <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Corredor</a></li>
-    </ul>
-</div>
+        // Cuando cambia la edición seleccionada
+        $('#edicionDropdown').change(function () {
+            var year = $('#yearDropdown').val();
+            var edicion = $(this).val();
+            if (edicion) {
+                // Solicitar categorías para la edición seleccionada
+                $.getJSON('/Home/CargarCategorias', { yearCarrera: year, ediCarrera: edicion }, function (data) {
+                    $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>');
+                    $.each(data, function (i, item) {
+                        $('#categoriaDropdown').append($('<option>', {
+                            value: item,
+                            text: item
+                        }));
+                    });
+                    $('#categoriaDropdown').prop('disabled', false);
+                });
+            } else {
+                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+            }
+        });
+    </script>
+    <div class="col-5 " style="text-align: center;">
 
-<div class="dropdown mt-3">
-    <button class="btn btn-primary dropdown-toggle" type="button" id="gestionCarrerasMenu" data-bs-toggle="dropdown" aria-expanded="false">
-        Gestión de Carreras
-    </button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCarrerasMenu">
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
-        <li><a class="dropdown-item" href="@Url.Action("Vincular_Participantes", "Home")">Vincular Participantes</a></li>
-        <li><a class="dropdown-item" href="@Url.Action("Generar_Reporte_Carrera", "Home")">Generar Reporte por Carrera</a></li>
-    </ul>
-</div>
-
-<!-- Modal Eliminar Carrera -->
-<div class="modal fade" id="modalEliminarCarrera" tabindex="-1" aria-labelledby="modalEliminarCarreraLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalEliminarCarreraLabel">Eliminar Carrera</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="carreraSeleccionada" class="form-label">Selecciona una carrera</label>
-                    <select class="form-control" id="carreraSeleccionada" onchange="cargarParametrosCarrera()">
-                        <option value="">Seleccione una carrera</option>
-                    </select>
+        <img style="width: 30%; height:45%;" src="https://cdn-icons-png.flaticon.com/512/1986/1986941.png" alt="">
+        <br><br>
+        <div class="row">
+            <div class="col-2"></div>
+            <div class="col-4">
+                <div class="dropdown">
+                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98; width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
+                    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Baja_corredores", "Home")'">Eliminar Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("BuscarEditarCorredor", "Home")'">Modificar Corredor</button></li>
+                        <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importarCorredoresModal">Importar corredores</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Reporte de Corredor</button></li>
+                    </ul>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="eliminarCarrera()">Eliminar</button>
+            <div class="col-4"><button class="btn btn-outline-light " style="background-color:#004A98 ;width:max-content;">Exportar resultados</button></div>
+        </div>
+        <br>
+        <br>
+        <div class="row">
+            <div class="col-2"></div>
+            <div class="col-4"><button class="btn btn-outline-light" style="background-color:#004A98; width:max-content;">Mostrar base de datos </button></div>
+            <div class="col-4">
+                <div class="dropdown">
+                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98 ;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
+                    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
+
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Modal para eliminar corredor -->
+    <!-- Modal para modificar corredor -->
+    <!-- Modal para Exportar Corredores -->
+    <!-- Modal para Reporte de Corredor -->
+    <!-- New Race Modal -->
+    <!-- Modal para eliminar carrera -->
+    <!-- Modal para modificar carrera -->
+    <!--Generar reporte de carrera-->
+    <div id="importarCorredoresModal" class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="menuImportarCorredores" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div id="cabeceraMenu" class="modal-header">
+                    <h5 class="modal-title" id="menuImportarCorredores">Importar Corredores</h5>
+                </div>
+                <div class="container">
+                    <form asp-controller="Home" asp-action="Upload" method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="fileUpload">Selecciona un archivo Excel (.xlsx)</label>
+                            <input type="file" class="form-control-file" id="fileUpload" name="fileUpload" accept=".xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Subir</button>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
+                    <div class="ms-auto">
+                        <button type="submit" class="btn btn-primary">Importar</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script>
-    // Cuando cambia el año seleccionado
-    $('#yearDropdown').change(function () {
-        var year = $(this).val();
-        if (year) {
-            // Solicitar ediciones para el año seleccionado
-            $.getJSON('/Home/CargarEdiciones', { yearCarrera: year }, function (data) {
-                $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>');
-                $.each(data, function (i, item) {
-                    $('#edicionDropdown').append($('<option>', {
-                        value: item,
-                        text: item
-                    }));
-                });
-                $('#edicionDropdown').prop('disabled', false);
-                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
-            });
-        } else {
-            $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>').prop('disabled', true);
-            $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
-        }
-    });
-
-    // Cuando cambia la edición seleccionada
-    $('#edicionDropdown').change(function () {
-        var year = $('#yearDropdown').val();
-        var edicion = $(this).val();
-        if (edicion) {
-            // Solicitar categorías para la edición seleccionada
-            $.getJSON('/Home/CargarCategorias', { yearCarrera: year, ediCarrera: edicion }, function (data) {
-                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>');
-                $.each(data, function (i, item) {
-                    $('#categoriaDropdown').append($('<option>', {
-                        value: item,
-                        text: item
-                    }));
-                });
-                $('#categoriaDropdown').prop('disabled', false);
-            });
-        } else {
-            $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
-        }
-    });
-</script>
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

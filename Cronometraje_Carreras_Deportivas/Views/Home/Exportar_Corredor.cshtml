@@ -1,0 +1,102 @@
+﻿@{
+    ViewData["Title"] = "Alta de Administrador";
+}
+
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+             style="max-width: 15%;">
+    </div>
+</nav>
+
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div id="cabeceraMenu" class="modal-header">
+                <h5 class="modal-title" id="menuExportarCorredores">Exportar Resultados</h5>
+            </div>
+            <div class="modal-body">
+            <div class="row">
+                <div class="btn-group col-4">
+                    <div class="form-floating">
+                        <select class="form-select" id="floatingSelectAno" name="ano" aria-label="Floating label select example">
+                            <option selected>Seleccione el año</option>
+                            <option value="2022">2022</option>
+                            <option value="2023">2023</option>
+                            <option value="2024">2024</option>
+                        </select>
+                        <label for="floatingSelectAno">Año</label>
+                    </div>
+                </div>
+
+                <div class="btn-group col-4">
+                    <div class="form-floating">
+                        <select class="form-select" id="floatingSelectEdicion" name="edicion" aria-label="Floating label select example">
+                            <option selected>Seleccione la edición</option>
+                            <option value="primavera">1</option>
+                            <option value="verano">2</option>
+                            <option value="otoño">3</option>
+                        </select>
+                        <label for="floatingSelectEdicion">Edición</label>
+                    </div>
+                </div>
+
+                <div class="btn-group col-4">
+                    <div class="form-floating">
+                        <select class="form-select" id="floatingSelectCategoria" name="categoria" aria-label="Floating label select example">
+                            <option selected>Seleccione la categoría</option>
+                            <option value="5">5 KM</option>
+                            <option value="10">10 KM</option>
+                            <option value="21">21 KM</option>
+                        </select>
+                        <label for="floatingSelectCategoria">Categoría</label>
+                    </div>
+                </div>
+            </div>
+                <div class="container">
+              
+                    <div class="row">
+                        <div class="col-md-12">
+                            <table class="table table-hover table-fixed table-primary table-striped table-bordered border-dark">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 90px;" scope="col">Posición</th>
+                                        <th style="width: 90px;" scope="col">Número</th>
+                                        <th style="width: 200px;" scope="col">Nombre</th>
+                                        <th style="width: 90px;" scope="col">T1</th>
+                                        <th style="width: 90px;" scope="col">T2</th>
+                                        <th style="width: 90px;" scope="col">T3</th>
+                                        <th style="width: 150px;" scope="col">Tiempo Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody style="height: 300px;">
+                                   
+                                    <!-- Repetir filas según sea necesario -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button type="button" class="btn btn-danger" onclick="window.location.href='@Url.Action("Pantalla_ini", "Home")'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Crear</button>
+            </div>
+            </div>
+        </div>
+    </div>
+
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/GL5U4Uqf5iC+NrQgiVdK33s5i5LlFnCjkHrC6s1" crossorigin="anonymous"></script>
+<script>
+    // Mostrar el mensaje de éxito y redirigir a la página de inicio de sesión después de unos segundos
+    document.addEventListener("DOMContentLoaded", function() {
+        var successAlert = document.querySelector(".alert-success");
+        if (successAlert) {
+            setTimeout(function() {
+                window.location.href = '@Url.Action("Index", "Home")';
+            }, 2000); // Redirige después de 2 segundos
+        }
+    });
+</script>
+

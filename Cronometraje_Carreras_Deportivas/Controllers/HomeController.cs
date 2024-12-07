@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Cronometraje_Carreras_Deportivas.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 
 #nullable enable
@@ -80,7 +81,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             return View();
         }
 
-       public async Task<IActionResult> Pantalla_ini()
+        public async Task<IActionResult> Pantalla_ini()
         {
             var anios = new List<int>();
             string connectionString = _configuration.GetConnectionString("DefaultConnection");
@@ -1102,7 +1103,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
-        
+
 
         [HttpGet]
         public async Task<IActionResult> Editar_Carrera()
@@ -1143,6 +1144,84 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             ViewBag.Carreras = carreras;
             return View();
         }
+
+
+        [HttpGet]
+        public async Task<IActionResult> CargarDatosCarreras(int id)
+        {
+            // Obtener la cadena de conexión desde el archivo de configuración
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            var carreraSeleccionada = new object();
+            var todasCategorias = new List<object>();
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Obtener datos de la carrera seleccionada
+                string carreraQuery = @"
+            SELECT 
+                ca.ID_carrera, 
+                ca.nom_carrera, 
+                ca.year_carrera, 
+                ca.edi_carrera,
+                STRING_AGG(cat.ID_categoria, ',') AS CategoriasIds,
+                STRING_AGG(cat.nombre_categoria, ',') AS CategoriasNombres
+            FROM CARRERA ca
+            JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera
+            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+            WHERE ca.ID_carrera = @CarreraId
+            GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera";
+
+                using (SqlCommand carreraCommand = new SqlCommand(carreraQuery, connection))
+                {
+                    carreraCommand.Parameters.AddWithValue("@CarreraId", id);
+
+                    using (SqlDataReader reader = await carreraCommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            carreraSeleccionada = new
+                            {
+                                Id = reader.GetInt32(0),
+                                Nombre = reader.GetString(1),
+                                Año = reader.GetInt32(2),
+                                Edicion = reader.GetInt32(3),
+                                Categorias = reader.GetString(4)
+                                                  .Split(',')
+                                                  .Select(c => new { Id = int.Parse(c) })
+                                                  .ToList()
+                            };
+                        }
+                    }
+                }
+
+                // Obtener todas las categorías
+                string categoriasQuery = "SELECT ID_categoria, nombre_categoria FROM CATEGORIA";
+
+                using (SqlCommand categoriasCommand = new SqlCommand(categoriasQuery, connection))
+                using (SqlDataReader reader = await categoriasCommand.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        todasCategorias.Add(new
+                        {
+                            Id = reader.GetInt32(0),
+                            Nombre = reader.GetString(1)
+                        });
+                    }
+                }
+            }
+
+            // Devolver los datos como JSON
+            return Json(new
+            {
+                carrera = carreraSeleccionada,
+                todasCategorias = todasCategorias
+            });
+        }
+
 
         [HttpPost]
         public async Task<IActionResult> Actualizar_Carrera(int carreraId, string nombreCarrera, int yearCarrera, List<int> categoriasSeleccionadas)
@@ -1289,6 +1368,58 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
             return Json(resultado);
         }
+        [HttpGet]
+        public IActionResult GetCategoriasPorCarrera(int carreraId)
+        {
+            var categorias = _context.CARR_Cat
+                .Where(cc => cc.ID_carrera == carreraId)
+                .Join(_context.CATEGORIA,
+                      cc => cc.ID_categoria,
+                      cat => cat.ID_categoria,
+                      (cc, cat) => new { cat.ID_categoria, cat.nombre_categoria })
+                .ToList();
+
+            return Json(categorias);
+        }
+
+        [HttpPost]
+public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
+{
+    try
+    {
+        string connectionString = _configuration.GetConnectionString("DefaultConnection");
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            await connection.OpenAsync();
+
+            string updateQuery = @"
+            UPDATE CORREDOR
+            SET nom_corredor = @Nombre, apP_corredor = @Apaterno, apM_corredor = @Amaterno, 
+                f_corredor = @Fnacimiento, pais = @Pais, c_corredor = @Correo
+            WHERE ID_corredor = @ID";
+
+            using (SqlCommand command = new SqlCommand(updateQuery, connection))
+            {
+                command.Parameters.AddWithValue("@ID", corredor.ID_corredor);
+                command.Parameters.AddWithValue("@Nombre", corredor.Nom_corredor);
+                command.Parameters.AddWithValue("@Apaterno", corredor.apP_corredor);
+                command.Parameters.AddWithValue("@Amaterno", (object?)corredor.apM_corredor ?? DBNull.Value);
+                command.Parameters.AddWithValue("@Fnacimiento", corredor.f_corredor);
+                command.Parameters.AddWithValue("@Pais", corredor.pais_corredor);
+                command.Parameters.AddWithValue("@Correo", (object?)corredor.c_corredor ?? DBNull.Value);
+
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+
+        return Json(new { success = true, message = "Corredor editado correctamente." });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError($"Error al guardar edición del corredor: {ex.Message}");
+        return Json(new { success = false, message = "Error al guardar los cambios." });
+    }
+}
 
 
         public IActionResult Error()
@@ -1310,5 +1441,86 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             public string Nombre { get; set; }
         }
 
+      
+
+        [HttpGet]
+        public async Task<IActionResult> BuscarEditarCorredor()
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            var carreras = new List<object>();
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+                string query = "SELECT ID_carrera, nom_carrera, year_carrera FROM CARRERA";
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            carreras.Add(new
+                            {
+                                ID = reader.GetInt32(0),
+                                Nombre = reader.GetString(1),
+                                Año = reader.GetInt32(2)
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return Json(carreras);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> BuscarCorredoresPorCarrera(int idCarrera, string filtro)
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            var corredores = new List<object>();
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+                string query = @"
+            SELECT c.ID_corredor, c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, c.sex_corredor, c.c_corredor, c.pais
+            FROM CORREDOR c
+            INNER JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+            INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+            WHERE cc.ID_carrera = @IdCarrera
+              AND (c.nom_corredor LIKE @Filtro OR c.c_corredor LIKE @Filtro)";
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@IdCarrera", idCarrera);
+                    command.Parameters.AddWithValue("@Filtro", $"%{filtro}%");
+
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            corredores.Add(new
+                            {
+                                ID = reader.GetValue(0),
+                                Nombre = reader.GetString(1),
+                                ApellidoPaterno = reader.GetString(2),
+                                ApellidoMaterno = reader.GetString(3),
+                                FechaNacimiento = reader.GetDateTime(4).ToString("yyyy-MM-dd"),
+                                Sexo = reader.GetString(5),
+                                Correo = reader.GetString(6),
+                                Pais = reader.GetString(7)
+                            });
+                        }
+                    }
+                }
+            }
+
+            return Json(corredores);
+        }
+
+
     }
+
+
 }

@@ -1,0 +1,150 @@
+﻿@{
+    ViewData["Title"] = "Alta de Administrador";
+}
+
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+             style="max-width: 15%;">
+    </div>
+</nav>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div id="cabeceraMenu" class="modal-header">
+                <h5 class="modal-title" id="menuEliminaCorredor">Eliminar Corredor</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h3>Información de la carrera</h3>
+                        <div class="row mb-3">
+                            <label class="col-sm-4 col-form-label">Año</label>
+                            <div class="col-sm-8">
+
+                            <div class="btn-group col">
+                                <div class="form-floating">
+                                    <select class="form-select" id="floatingSelectAno" name="ano" aria-label="Floating label select example">
+                                        <option selected>Seleccione el año</option>
+                                        <option value="2022">2022</option>
+                                        <option value="2023">2023</option>
+                                        <option value="2024">2024</option>
+                                    </select>
+                                    <label for="floatingSelectAno">Año</label>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-4 col-form-label">Edición</label>
+                            <div class="col-sm-8">
+                            <div class="btn-group col">
+                                <div class="form-floating">
+                                    <select class="form-select" id="floatingSelectEdicion" name="edicion" aria-label="Floating label select example">
+                                        <option selected>Seleccione la edición</option>
+                                        <option value="primavera">1</option>
+                                        <option value="verano">2</option>
+                                        <option value="otoño">3</option>
+                                    </select>
+                                    <label for="floatingSelectEdicion">Edición</label>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                        <h3>Información del corredor</h3>
+                        <div class="row mb-3">
+                            <label class="col-sm-4 col-form-label">Clave del corredor</label>
+                            <div class="col-sm-8">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-4 col-form-label">Num. de corredor</label>
+                            <div class="col-sm-8">
+                                <input type="text" class="form-control">
+                                <button class="btn btn-outline-primary mt-2">Buscar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6" style="background-color: #ecebeb; border-radius: 5px;">
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Nombre</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Apellido paterno</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Apellido materno</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Fecha de nacimiento</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">País</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Sexo</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Teléfono</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">Correo electrónico</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-6 col-form-label">categoria</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='@Url.Action("Pantalla_ini", "Home")'">Cancelar</button>
+                <button type="submit" class="btn btn-danger">eliminar</button>
+            </div>
+            </div>
+
+       
+        </div>
+    </div>
+
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/GL5U4Uqf5iC+NrQgiVdK33s5i5LlFnCjkHrC6s1" crossorigin="anonymous"></script>
+<script>
+    // Mostrar el mensaje de éxito y redirigir a la página de inicio de sesión después de unos segundos
+    document.addEventListener("DOMContentLoaded", function() {
+        var successAlert = document.querySelector(".alert-success");
+        if (successAlert) {
+            setTimeout(function() {
+                window.location.href = '@Url.Action("Index", "Home")';
+            }, 2000); // Redirige después de 2 segundos
+        }
+    });
+</script>
+

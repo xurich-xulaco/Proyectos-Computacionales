@@ -1,0 +1,251 @@
+﻿@{
+    ViewData["Title"] = "Alta de Administrador";
+}
+
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+             style="max-width: 15%;">
+    </div>
+</nav>
+
+<div class="modal-dialog modal-lg">
+    <div class="modal-content">
+       
+            <div class="modal-header" id="cabeceraMenu">
+                <h5 class="modal-title" id="menuReporteCarrera">Datos de reporte general</h5>
+            </div>
+            <div class="modal-body">
+            <div class="row">
+               
+                    
+                    <div class="col">
+
+                        <div class="btn-group col">
+                            <div class="form-floating">
+                                <select class="form-select" id="floatingSelectAno" name="ano" aria-label="Floating label select example">
+                                    <option selected>Seleccione el año</option>
+                                    <option value="2022">2022</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2024">2024</option>
+                                </select>
+                                <label for="floatingSelectAno">Año</label>
+                            </div>
+                        </div>
+                    </div>
+               
+                    <div class="col">
+                        <div class="btn-group col">
+                            <div class="form-floating">
+                                <select class="form-select" id="floatingSelectEdicion" name="edicion" aria-label="Floating label select example">
+                                    <option selected>Seleccione la edición</option>
+                                    <option value="primavera">1</option>
+                                    <option value="verano">2</option>
+                                    <option value="otoño">3</option>
+                                </select>
+                                <label for="floatingSelectEdicion">Edición</label>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                <div class="col">
+                    <div class="btn-group col">
+                        <div class="form-floating">
+                            <select class="form-select" id="floatingSelectCategoria" name="categoria" aria-label="Floating label select example">
+                                <option selected>Seleccione el nombre de la carrera</option>
+                                <option value="5">Medio maraton universitario </option>
+                                <option value="10">carrera de prueba 1</option>
+                                <option value="21">carrera de prueba 2</option>
+                            </select>
+                            <label for="floatingSelectCategoria">Nombre de la carrera</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+      
+                <div class="d-flex gap-5 col-12 mx-auto">
+                    <dl class="row">
+
+                        <dt class="col-sm-4">
+                            <h5>Mixta 10km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Num. Hombres
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Num. Mujeres
+                                </label>
+                            </div>
+                        </dt>
+
+                        <dt class="col-sm-4">
+                            <h5>Mujeres 10km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                        </dt>
+
+                        <dt class="col-sm-4">
+                            <h5>Hombres 10km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                        </dt>
+
+                        <dt class="col-sm-4">
+                            <h5>Mixta 21km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Num. Hombres
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Num. Mujeres
+                                </label>
+                            </div>
+                        </dt>
+
+                        <dt class="col-sm-4">
+                            <h5>Mujeres 21km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                        </dt>
+
+                        <dt class="col-sm-4">
+                            <h5>Hombres 21km:</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Podio
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Menor tiempo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                                <label class="form-check-label" for="flexCheckDefault">
+                                    Tiempo promedio
+                                </label>
+                            </div>
+                        </dt>
+                    </dl>
+                </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button type="button" class="btn btn-danger" onclick="window.location.href='@Url.Action("Pantalla_ini", "Home")'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Crear</button>
+            </div>
+            </div>
+     
+       
+    </div>
+</div>
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/GL5U4Uqf5iC+NrQgiVdK33s5i5LlFnCjkHrC6s1" crossorigin="anonymous"></script>
+<script>
+    // Mostrar el mensaje de éxito y redirigir a la página de inicio de sesión después de unos segundos
+    document.addEventListener("DOMContentLoaded", function() {
+        var successAlert = document.querySelector(".alert-success");
+        if (successAlert) {
+            setTimeout(function() {
+                window.location.href = '@Url.Action("Index", "Home")';
+            }, 2000); // Redirige después de 2 segundos
+        }
+    });
+</script>
+

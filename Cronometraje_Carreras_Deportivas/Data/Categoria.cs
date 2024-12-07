@@ -5,6 +5,8 @@
         public int ID_categoria { get; set; }
         public string nombre_categoria { get; set; }
 
+
+
     }
 
 }

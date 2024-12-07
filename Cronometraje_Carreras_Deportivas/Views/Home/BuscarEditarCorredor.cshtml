@@ -1,0 +1,142 @@
+﻿@{
+    ViewBag.Title = "Buscar y Editar Corredores";
+    
+}
+
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+             style="max-width: 15%;">
+    </div>
+</nav>
+
+
+<div class="container">
+    <h2 class="text-center">Modificar Corredor</h2>
+
+    <!-- Selección de carrera -->
+    <div class="form-group mb-3">
+        <label for="carreraSelect" class="form-label"><strong>Selecciona una carrera:</strong></label>
+        <select id="carreraSelect" class="form-select">
+            <option value="">Selecciona una carrera</option>
+        </select>
+    </div>
+
+    <!-- Buscador de corredores -->
+    <div class="form-group mb-3">
+        <label for="buscarInput" class="form-label"><strong>Buscar Corredor:</strong></label>
+        <input type="text" id="buscarInput" class="form-control" placeholder="Ingresa nombre o correo" />
+        <button id="buscarBtn" class="btn btn-primary mt-2">Buscar</button>
+    </div>
+
+    <!-- Resultados -->
+    <div id="resultados" class="mt-4"></div>
+
+    <!-- Formulario de edición -->
+    <div id="formEditar" style="display:none;" class="mt-4">
+        <h4>Editar Corredor</h4>
+        <form id="editarForm">
+            <input type="hidden" id="idCorredor" name="idCorredor" />
+
+            <div class="form-group mb-3">
+                <label for="nombre" class="form-label">Nombre:</label>
+                <input type="text" id="nombre" name="nombre" class="form-control" />
+            </div>
+            <div class="form-group mb-3">
+                <label for="apPaterno" class="form-label">Apellido Paterno:</label>
+                <input type="text" id="apPaterno" name="apPaterno" class="form-control" />
+            </div>
+            <div class="form-group mb-3">
+                <label for="apMaterno" class="form-label">Apellido Materno:</label>
+                <input type="text" id="apMaterno" name="apMaterno" class="form-control" />
+            </div>
+            <div class="form-group mb-3">
+                <label for="fecha" class="form-label">Fecha de Nacimiento:</label>
+                <input type="date" id="fecha" name="fecha" class="form-control" />
+            </div>
+            <div class="form-group mb-3">
+                <label for="correo" class="form-label">Correo:</label>
+                <input type="email" id="correo" name="correo" class="form-control" />
+            </div>
+            <div class="form-group mb-3">
+                <label for="pais" class="form-label">País:</label>
+                <input type="text" id="pais" name="pais" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-success">Guardar Cambios</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $.get('/Home/ObtenerCarrerasedit', function (data) {
+                const carreraSelect = $('#carreraSelect');
+                if (data.length > 0) {
+                    data.forEach(carrera => {
+                        carreraSelect.append(`<option value="${carrera.ID}">${carrera.Nombre} (${carrera.Año})</option>`);
+                    });
+                } else {
+                    carreraSelect.append('<option value="">No hay carreras disponibles</option>');
+                }
+            }).fail(function () {
+                alert('Error al cargar las carreras.');
+            });
+        });
+
+        $('#buscarBtn').click(function () {
+            const carreraId = $('#carreraSelect').val();
+            const filtro = $('#buscarInput').val();
+
+            if (carreraId) {
+                $.get(`/Home/BuscarCorredoresPorCarrera?idCarrera=${carreraId}&filtro=${filtro}`, function (data) {
+                    if (data.length > 0) {
+                        let html = '<ul class="list-group">';
+                        data.forEach(corredor => {
+                            html += `
+                                <li class="list-group-item">
+                                    ${corredor.Nombre} ${corredor.ApellidoPaterno} (${corredor.Correo})
+                                    <button class="btn btn-link editarBtn" data-id="${corredor.ID}" data-nombre="${corredor.Nombre}" data-apP="${corredor.ApellidoPaterno}" data-apM="${corredor.ApellidoMaterno}" data-fecha="${corredor.FechaNacimiento}" data-correo="${corredor.Correo}" data-pais="${corredor.Pais}">Editar</button>
+                                </li>`;
+                        });
+                        html += '</ul>';
+                        $('#resultados').html(html);
+
+                        // Manejar evento "Editar"
+                        $('.editarBtn').click(function () {
+                            const corredor = $(this).data();
+                            $('#idCorredor').val(corredor.id);
+                            $('#nombre').val(corredor.nombre);
+                            $('#apPaterno').val(corredor.apP);
+                            $('#apMaterno').val(corredor.apM);
+                            $('#fecha').val(corredor.fecha);
+                            $('#correo').val(corredor.correo);
+                            $('#pais').val(corredor.pais);
+
+                            $('#formEditar').show();
+                        });
+                    } else {
+                        $('#resultados').html('<p>No se encontraron corredores.</p>');
+                    }
+                }).fail(function () {
+                    alert('Error al buscar los corredores.');
+                });
+            } else {
+                alert('Por favor selecciona una carrera.');
+            }
+        });
+
+
+        // Guardar cambios
+        $('#editarForm').submit(function (e) {
+            e.preventDefault();
+            const data = $(this).serialize();
+
+            $.post('/Home/GuardarCambiosCorredor', data, function (response) {
+                alert(response.message);
+                $('#formEditar').hide();
+            });
+        });
+    </script>
+}

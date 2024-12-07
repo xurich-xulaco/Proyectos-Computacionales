@@ -1,11 +1,21 @@
-﻿@{
+﻿﻿@{
     ViewData["Title"] = "Crear Corredor";
 }
 
-<div class="form-wrapper">
-    <h2>Crear Corredor</h2>
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+    </div>
 
-    <form id="crear-corredor-form" class="form-container">
+</nav>
+
+
+
+<div class="container" style="display: flex; justify-content: center; align-items: center;; background-color: rgba(0, 0, 0, 0.05);">
+    <div class="modal-content" style="width: 600px; padding: 20px; border-radius: 8px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);">
+    <h2>Crear Corredor</h2>
+    <div class="col">
+    <form id="crear-corredor-form" class="form">
         <!-- Fila 1: Nombres, Apellido Paterno, Apellido Materno -->
         <div class="form-row">
             <div class="form-group col-md-4">
@@ -23,7 +33,7 @@
         </div>
 
         <!-- Fila 2: Fecha de Nacimiento -->
-        <div class="form-row">
+        <div class="row">
             <div class="form-group col-md-12">
                 <label for="Fnacimiento">Fecha de Nacimiento <span class="text-danger">*</span></label>
                 <input type="date" class="form-control" id="Fnacimiento" name="Fnacimiento" required />
@@ -31,7 +41,7 @@
         </div>
 
         <!-- Fila 3: País y Teléfono -->
-        <div class="form-row">
+        <div class="row">
             <div class="form-group col-md-6">
                 <label for="Pais">País <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="Pais" name="Pais" required />
@@ -43,24 +53,25 @@
         </div>
 
         <!-- Fila 4: Correo -->
-        <div class="form-row">
+        <div class="row">
             <div class="form-group col-md-12">
                 <label for="Correo">Correo Electrónico (Opcional)</label>
                 <input type="email" class="form-control" id="Correo" name="Correo" placeholder="Opcional" />
             </div>
         </div>
 
-        <div class="form-row">
+        <div class="row">
             <select id="Sexo" name="Sexo" required>
                 <option value="" disabled selected>Seleccione Sexo</option>
                 <option value="M">Masculino</option>
                 <option value="F">Femenino</option>
             </select>
         </div>
-        <div class="form-row">
+        <div class="row">
             <select id="CarreraId" name="CarreraId" required>
                 <option value="" disabled selected>Seleccione una Carrera</option>
                 @foreach (var carrera in ViewBag.Carreras)
+
                 {
                     <option value="@carrera.Value">@carrera.Text</option>
                 }
@@ -74,6 +85,8 @@
             <button type="button" id="crear-btn" class="btn btn-create">Crear</button>
         </div>
     </form>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -101,32 +114,32 @@
         });
 
         // Manejo del botón "Crear"
-           $("#crear-btn").click(function () {
-        const formData = $("#crear-corredor-form").serialize();
-        $.post("/Home/Crear_Corredor", formData, function (response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: "success",
-                    title: "Éxito",
-                    text: response.message,
-                }).then(() => {
-                    window.location.href = "/Home/Pantalla_ini";
-                });
-            } else {
+        $("#crear-btn").click(function () {
+            const formData = $("#crear-corredor-form").serialize();
+            $.post("/Home/Crear_Corredor", formData, function (response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Éxito",
+                        text: response.message,
+                    }).then(() => {
+                        window.location.href = "/Home/Pantalla_ini";
+                    });
+                } else {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: response.message,
+                    });
+                }
+            }).fail(function () {
                 Swal.fire({
                     icon: "error",
                     title: "Error",
-                    text: response.message,
+                    text: "Ocurrió un error inesperado.",
                 });
-            }
-        }).fail(function () {
-            Swal.fire({
-                icon: "error",
-                title: "Error",
-                text: "Ocurrió un error inesperado.",
             });
         });
-    });
 
     });
 </script>
@@ -137,7 +150,7 @@
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        display: flex;
+        
         justify-content: center;
         align-items: center;
         height: 100vh;

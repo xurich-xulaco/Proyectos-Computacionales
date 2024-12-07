@@ -7,6 +7,8 @@
         public int ID_carr_cat { get; set; }
         public int num_corredor { get; set; }
         public string folio_chip { get; set; }
+        public Corredor Corredor { get; set; }
+        public Carr_cat Carr_cat { get; set; }
     }
 
 }
