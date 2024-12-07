@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Cronometraje_Carreras_Deportivas.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
 
 
 #nullable enable
@@ -1520,6 +1521,145 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
         }
 
 
+
+        [HttpGet]
+        public async Task<IActionResult> Importar_Corredores()
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var carreras = new List<SelectListItem>();
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    string query = @"
+        SELECT 
+            ca.ID_carrera,
+            CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
+                   '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+        FROM CARRERA ca
+        JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+        GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+        ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            carreras.Add(new SelectListItem
+                            {
+                                Value = reader["ID_carrera"].ToString(),
+                                Text = reader["Carrera"].ToString()
+                            });
+                        }
+                    }
+                }
+
+                ViewBag.Carreras = carreras;
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cargar carreras: {ex.Message}");
+                return View("Error");
+            }
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> Subir_ArchivoCorredor(string rutaArchivo, int carreraId, string categoriaNombre)
+        {
+            if (!string.IsNullOrEmpty(rutaArchivo) && System.IO.File.Exists(rutaArchivo))
+            {
+                try
+                {
+                    _logger.LogInformation($"Procesando archivo en la ruta: {rutaArchivo}");
+                    int filasProcesadas = 0;
+                    int errores = 0;
+
+                    using (var workbook = new XLWorkbook(rutaArchivo))
+                    {
+                        var worksheet = workbook.Worksheet(1);
+                        var filas = worksheet.RowsUsed();
+
+                        foreach (var fila in filas.Skip(1)) // Saltar encabezados
+                        {
+                            try
+                            {
+                                if (fila.Cells().All(cell => cell.IsEmpty()))
+                                {
+                                    _logger.LogWarning($"Fila {fila.RowNumber()} está vacía. Saltando.");
+                                    continue;
+                                }
+
+                                var nom_corredor = fila.Cell(1).GetString();
+                                var apellido_paterno = fila.Cell(2).GetString();
+                                var apellido_materno = fila.Cell(3).GetString();
+                                var fecha_cumpleanios_celda = fila.Cell(4);
+                                var sexo_corredor = fila.Cell(5).GetString().Trim();
+                                var correo_corredor = fila.Cell(6).GetString();
+                                var pais = fila.Cell(7).GetString();
+                                var telefono = fila.Cell(8).GetString();
+
+                                if (sexo_corredor != "M" && sexo_corredor != "F")
+                                {
+                                    _logger.LogError($"Error en fila {fila.RowNumber()}: Sexo '{sexo_corredor}' no válido.");
+                                    errores++;
+                                    continue;
+                                }
+
+                                if (!DateTime.TryParse(fecha_cumpleanios_celda.GetString(), out var fechaCumpleanios))
+                                {
+                                    _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento no válida.");
+                                    errores++;
+                                    continue;
+                                }
+
+                                _logger.LogInformation($"Procesando fila {fila.RowNumber()}: {nom_corredor} {apellido_paterno}.");
+                                await Crear_Corredor(
+                                    Nombre: nom_corredor,
+                                    Apaterno: apellido_paterno,
+                                    Amaterno: apellido_materno,
+                                    Fnacimiento: fechaCumpleanios,
+                                    Sexo: sexo_corredor,
+                                    Correo: correo_corredor,
+                                    Pais: pais,
+                                    Telefono: telefono,
+                                    CarreraId: carreraId,
+                                    CategoriaNombre: categoriaNombre
+                                );
+
+                                filasProcesadas++;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error procesando fila {fila.RowNumber()}: {ex.Message}");
+                                errores++;
+                                continue;
+                            }
+                        }
+                    }
+
+                    var message = errores == 0
+                        ? $"{filasProcesadas} corredores procesados exitosamente."
+                        : $"Archivo procesado con errores: {filasProcesadas} filas exitosas, {errores} errores.";
+
+                    _logger.LogInformation(message);
+                    return Json(new { success = true, message });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al procesar el archivo: {ex.Message}");
+                    return Json(new { success = false, message = $"Error al procesar el archivo: {ex.Message}" });
+                }
+            }
+
+            _logger.LogError("La ruta del archivo no es válida o no existe.");
+            return Json(new { success = false, message = "La ruta del archivo no es válida." });
+        }
     }
 
 
