@@ -1,0 +1,304 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eliminar Corredor</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+         
+            width: 600px;
+        }
+
+            .container h1 {
+                text-align: center;
+                font-size: 1.5em;
+                margin-bottom: 20px;
+            }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+            .form-row label {
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+
+            .form-row input,
+            .form-row select {
+                padding: 8px;
+                font-size: 1em;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 1em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #buscar {
+            background-color: blue;
+            color: white;
+        }
+
+        #eliminar {
+            background-color: red;
+            color: white;
+        }
+
+        #cancelar {
+            background-color: gray;
+            color: white;
+        }
+
+        #resultado input {
+            background-color: #f9f9f9;
+            border: none;
+            cursor: not-allowed;
+        }
+
+        #resultado {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+
+
+
+<body>
+    <nav class="navbar navbar-expand-sm header">
+        <div class="container-fluid">
+            <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+                 style="max-width: 15%;">
+        </div>
+    </nav>
+    <div  style=" justify-content: center; align-items: center;">
+
+        <div class="container ">
+           
+            <div class="col">
+
+  
+        <h1>Eliminar Corredor</h1>
+        <form id="formBuscar">
+            <div class="form-row">
+                <div>
+                    <label for="year">Año:</label>
+                    <select id="year" name="year">
+                        <option value="">Seleccione el año</option>
+                        @foreach (var anio in ViewBag.Anios)
+                        {
+                            <option value="@anio">@anio</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="edicion">Edición:</label>
+                    <select id="edicion" name="edicion">
+                        <option value="">Seleccione la edición</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="categoria">Categoría:</label>
+                    <select id="categoria" name="categoria">
+                        <option value="">Seleccione la categoría</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div>
+                    <label for="numero">Número:</label>
+                    <input type="number" id="numero" name="numero" required />
+                </div>
+                <div>
+                    <button type="button" id="buscar">Buscar</button>
+                </div>
+            </div>
+
+            <div id="resultado">
+                <div class="form-row">
+                    <div>
+                        <label for="nombre">Nombre:</label>
+                        <input type="text" id="nombre" readonly />
+                    </div>
+                    <div>
+                        <label for="apellidoPaterno">Apellido Paterno:</label>
+                        <input type="text" id="apellidoPaterno" readonly />
+                    </div>
+                    <div>
+                        <label for="apellidoMaterno">Apellido Materno:</label>
+                        <input type="text" id="apellidoMaterno" readonly />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div>
+                        <label for="fechaNacimiento">Fecha de Nacimiento:</label>
+                        <input type="date" id="fechaNacimiento" readonly />
+                    </div>
+                    <div>
+                        <label for="sexo">Sexo:</label>
+                        <input type="text" id="sexo" readonly />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div>
+                        <label for="pais">País:</label>
+                        <input type="text" id="pais" readonly />
+                    </div>
+                    <div>
+                        <label for="correo">Correo:</label>
+                        <input type="text" id="correo" readonly />
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button type="button" id="cancelar">Cancelar</button>
+                <button type="button" id="eliminar">Eliminar</button>
+            </div>
+        </form>
+    </div>
+            </div>
+             </div>
+             <br />
+    
+
+    <script>
+        $(document).ready(function () {
+            $('#year').change(function () {
+                const year = $(this).val();
+
+                if (year) {
+                    $.get(`/Home/CargarEdiciones?yearCarrera=${year}`, function (data) {
+                        const edicionSelect = $('#edicion');
+                        edicionSelect.empty();
+                        edicionSelect.append('<option value="">Seleccione la edición</option>');
+
+                        data.forEach(function (edicion) {
+                            edicionSelect.append(`<option value="${edicion}">${edicion}</option>`);
+                        });
+                    });
+                } else {
+                    $('#edicion').empty().append('<option value="">Seleccione la edición</option>');
+                }
+            });
+
+            $('#edicion').change(function () {
+                const year = $('#year').val();
+                const edicion = $(this).val();
+
+                if (year && edicion) {
+                    $.get(`/Home/CargarCategorias?yearCarrera=${year}&ediCarrera=${edicion}`, function (data) {
+                        const categoriaSelect = $('#categoria');
+                        categoriaSelect.empty();
+                        categoriaSelect.append('<option value="">Seleccione la categoría</option>');
+
+                        data.forEach(function (categoria) {
+                            categoriaSelect.append(`<option value="${categoria}">${categoria}</option>`);
+                        });
+                    });
+                } else {
+                    $('#categoria').empty().append('<option value="">Seleccione la categoría</option>');
+                }
+            });
+
+            $('#buscar').click(function () {
+                const year = $('#year').val();
+                const edicion = $('#edicion').val();
+                const categoria = $('#categoria').val();
+                const numero = $('#numero').val();
+
+                if (!year || !edicion || !categoria || !numero) {
+                    alert('Por favor, completa todos los campos antes de buscar.');
+                    return;
+                }
+
+                $.post('/Home/BuscarCorredor', { year, edicion, categoria, numero }, function (data) {
+                    if (data.success) {
+                        $('#nombre').val(data.corredor.Nombre);
+                        $('#apellidoPaterno').val(data.corredor.ApellidoPaterno);
+                        $('#apellidoMaterno').val(data.corredor.ApellidoMaterno);
+                        $('#fechaNacimiento').val(data.corredor.FechaNacimiento);
+                        $('#sexo').val(data.corredor.Sexo);
+                        $('#pais').val(data.corredor.Pais);
+                        $('#correo').val(data.corredor.Correo);
+                    } else {
+                        alert(data.message);
+                    }
+                });
+            });
+
+            $('#cancelar').click(function () {
+                window.location.href = '/Home/Pantalla_ini';
+            });
+
+            $('#eliminar').click(function () {
+                const year = $('#year').val();
+                const edicion = $('#edicion').val();
+                const categoria = $('#categoria').val();
+                const numero = $('#numero').val();
+
+                if (!year || !edicion || !categoria || !numero) {
+                    alert('Por favor, realiza una búsqueda antes de intentar eliminar.');
+                    return;
+                }
+
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: 'No podrás deshacer esta acción',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.post('/Home/EliminarCorredor', { year, edicion, categoria, numero }, function (data) {
+                            if (data.success) {
+                                Swal.fire('¡Eliminado!', data.message, 'success').then(() => {
+                                    window.location.href = '/Home/Pantalla_ini';
+                                });
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

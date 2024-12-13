@@ -1,0 +1,107 @@
+is_global = true
+build_property.TargetFramework = net8.0
+build_property.TargetFramework = net8.0
+build_property.TargetPlatformMinVersion = 
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = Cronometraje_Carreras_Deportivas
+build_property.RootNamespace = Cronometraje_Carreras_Deportivas
+build_property.ProjectDir = D:\escritorio\Nueva carpeta\06-12-2024\Cronometraje_Carreras_Deportivas_funcional\Cronometraje_Carreras_Deportivas\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 8.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = D:\escritorio\Nueva carpeta\06-12-2024\Cronometraje_Carreras_Deportivas_funcional\Cronometraje_Carreras_Deportivas
+build_property._RazorSourceGeneratorDebug = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Alta_administrador.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxBbHRhX2FkbWluaXN0cmFkb3IuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Alta_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxBbHRhX0NvcnJlZG9yLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/baja.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxiYWphLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Baja_administrador.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxCYWphX2FkbWluaXN0cmFkb3IuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Crear_Carrera.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxDcmVhcl9DYXJyZXJhLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Crear_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxDcmVhcl9Db3JyZWRvci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Editar_Carrera.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxFZGl0YXJfQ2FycmVyYS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Eliminar_Carrera.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxFbGltaW5hcl9DYXJyZXJhLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Eliminar_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxFbGltaW5hcl9Db3JyZWRvci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Exportar_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxFeHBvcnRhcl9Db3JyZWRvci5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Modificar_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxNb2RpZmljYXJfQ29ycmVkb3IuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Pantalla_ini.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxQYW50YWxsYV9pbmkuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Reporte_Carrera.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxSZXBvcnRlX0NhcnJlcmEuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Home/Reporte_Corredor.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxSZXBvcnRlX0NvcnJlZG9yLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Shared/Error.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXEVycm9yLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Shared/_ValidationScriptsPartial.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/_ViewImports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcX1ZpZXdJbXBvcnRzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/_ViewStart.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcX1ZpZXdTdGFydC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/escritorio/Nueva carpeta/06-12-2024/Cronometraje_Carreras_Deportivas_funcional/Cronometraje_Carreras_Deportivas/Views/Shared/_Layout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9MYXlvdXQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = b-6dkoixmppp

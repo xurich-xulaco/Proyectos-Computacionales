@@ -1,0 +1,380 @@
+﻿@{
+    ViewBag.Title = "Pantalla Inicial";
+}
+
+<nav class="navbar navbar-expand-sm  header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+        <div class="rounded-pill">
+            <h4>tomas tapia</h4>
+            <button class="btn btn-outline-light"><a href="iniciar-sesion.html">Cerrar sesión </a> </button>
+
+        </div>
+    </div>
+</nav>
+<br>
+<form id="searchForm" method="post" action="@Url.Action("BuscarCorredores", "Home")">
+    <!-- Formulario en una línea con distribución de dos mitades -->
+    <div class="d-flex justify-content-between">
+        <div class="w-50">
+            <div class="form-group w-100">
+                <label for="nombreCorredor">Nombre del Corredor:</label>
+                <input type="text" id="nombreCorredor" name="nombreCorredor" value="@ViewBag.NombreBuscado">
+            </div>
+        </div>
+        <div class="w-50 d-flex justify-content-end">
+            <div class="form-group mx-2">
+                <label for="yearDropdown">Año:</label>
+                <select id="yearDropdown" name="yearCarrera" class="form-control">
+                    <option value="">Selecciona un año</option>
+                    @foreach (var year in ViewBag.Anios)
+                    {
+                        <option value="@year">@year</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group mx-2">
+                <label for="edicionDropdown">Edición:</label>
+                <select id="edicionDropdown" name="ediCarrera" class="form-control" disabled>
+                    <option value="">Selecciona una edición</option>
+                </select>
+            </div>
+            <div class="form-group mx-2">
+                <label for="categoriaDropdown">Categoría:</label>
+                <select id="categoriaDropdown" name="categoria" class="form-control" disabled>
+                    <option value="">Selecciona una categoría</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary mx-2">Buscar</button>
+        </div>
+    </div>
+</form>
+
+@if (!string.IsNullOrEmpty(ViewBag.Error))
+{
+    <div class="alert alert-danger">@ViewBag.Error</div>
+}
+
+
+<div class="row">
+    <!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
+    <div class="col-6 ">
+        <div id="resultTable" class="mt-4" style=" margin: auto;">
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Posición</th>
+                        <th>Número</th>
+                        <th>Nombre</th>
+                        <th>T1</th>
+                        <th>T2</th>
+                        <th>T3</th>
+                        <th>Tiempo Total</th>
+                    </tr>
+                </thead>
+                @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
+                {
+                    <tbody>
+                        @foreach (var corredor in ViewBag.ResultadosBusqueda)
+                        {
+                            <tr>
+                                <td>@corredor["Posicion"]</td>
+                                <td>@corredor["NumCorredor"]</td>
+                                <td>@corredor["Nombre"]</td>
+                                <td>@corredor["T1"]</td>
+                                <td>@corredor["T2"]</td>
+                                <td>@corredor["T3"]</td>
+                                <td>@corredor["TiempoTotal"]</td>
+                            </tr>
+                        }
+                    </tbody>
+                }
+                else if (ViewBag.ResultadosBusqueda != null)
+                {
+                    <p>No se encontraron resultados para los criterios de búsqueda.</p>
+                }
+            </table>
+
+        </div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        // Cuando cambia el año seleccionado
+        $('#yearDropdown').change(function () {
+            var year = $(this).val();
+            if (year) {
+                // Solicitar ediciones para el año seleccionado
+                $.getJSON('/Home/CargarEdiciones', { yearCarrera: year }, function (data) {
+                    $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>');
+                    $.each(data, function (i, item) {
+                        $('#edicionDropdown').append($('<option>', {
+                            value: item,
+                            text: item
+                        }));
+                    });
+                    $('#edicionDropdown').prop('disabled', false);
+                    $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+                });
+            } else {
+                $('#edicionDropdown').empty().append('<option value="">Selecciona una edición</option>').prop('disabled', true);
+                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+            }
+        });
+
+        // Cuando cambia la edición seleccionada
+        $('#edicionDropdown').change(function () {
+            var year = $('#yearDropdown').val();
+            var edicion = $(this).val();
+            if (edicion) {
+                // Solicitar categorías para la edición seleccionada
+                $.getJSON('/Home/CargarCategorias', { yearCarrera: year, ediCarrera: edicion }, function (data) {
+                    $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>');
+                    $.each(data, function (i, item) {
+                        $('#categoriaDropdown').append($('<option>', {
+                            value: item,
+                            text: item
+                        }));
+                    });
+                    $('#categoriaDropdown').prop('disabled', false);
+                });
+            } else {
+                $('#categoriaDropdown').empty().append('<option value="">Selecciona una categoría</option>').prop('disabled', true);
+            }
+        });
+    </script>
+    <div class="col-5 " style="text-align: center;">
+
+        <img style="width: 30%; height:45%;" src="https://cdn-icons-png.flaticon.com/512/1986/1986941.png" alt="">
+        <br><br>
+        <div class="row">
+            <div class="col-2"></div>
+            <div class="col-4">
+                <div class="dropdown">
+                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98; width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
+                    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Modificar_Corredor", "Home")'">Modificar Corredor</button></li>
+                        <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importarCorredoresModal">Importar corredores</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Reporte de Corredor</button></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-4"><button class="btn btn-outline-light " style="background-color:#004A98 ;width:max-content;">Exportar resultados</button></div>
+        </div>
+        <br>
+        <br>
+        <div class="row">
+            <div class="col-2"></div>
+            <div class="col-4"><button class="btn btn-outline-light" style="background-color:#004A98; width:max-content;">Mostrar base de datos </button></div>
+            <div class="col-4">
+                <div class="dropdown">
+                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98 ;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
+                    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
+                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
+                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
+
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Modal para eliminar corredor -->
+    <!-- Modal para modificar corredor -->
+    <!-- Modal para Exportar Corredores -->
+    <!-- Modal para Reporte de Corredor -->
+    <!-- New Race Modal -->
+    <!-- Modal para eliminar carrera -->
+    <!-- Modal para modificar carrera -->
+    <!--Generar reporte de carrera-->
+    <div id="importarCorredoresModal" class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="menuImportarCorredores" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div id="cabeceraMenu" class="modal-header">
+                    <h5 class="modal-title" id="menuImportarCorredores">Importar Corredores</h5>
+                </div>
+                <div class="container">
+                    <form asp-controller="Home" asp-action="Upload" method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="fileUpload">Selecciona un archivo Excel (.xlsx)</label>
+                            <input type="file" class="form-control-file" id="fileUpload" name="fileUpload" accept=".xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Subir</button>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
+                    <div class="ms-auto">
+                        <button type="submit" class="btn btn-primary">Importar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    async function crearCarrera() {
+        const nombreCarrera = document.getElementById('nombreCarrera').value;
+        const yearCarrera = document.getElementById('yearCarrera').value;
+
+        // Verificación de campos vacíos
+        if (!nombreCarrera || !yearCarrera) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Campos incompletos',
+                text: 'Por favor, complete todos los campos.'
+            });
+            return;
+        }
+
+        try {
+            // Enviar los datos al servidor con fetch
+            const response = await fetch('@Url.Action("Alta_Carrera", "Home")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    nom_carrera: nombreCarrera,
+                    year_carrera: parseInt(yearCarrera)
+                })
+            });
+
+            const result = await response.json();
+            // Mostrar mensaje de éxito o error según el resultado
+            if (result.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Éxito',
+                    text: result.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    // Redirigir a Pantalla_ini
+                    window.location.href = '@Url.Action("Pantalla_ini", "Home")';
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: result.message
+                });
+            }
+        } catch (error) {
+            // Mostrar mensaje de error en caso de fallo de la solicitud
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Ocurrió un error al intentar crear la carrera. Intente nuevamente.'
+            });
+        }
+    }
+</script>
+
+<script>
+    // Cargar las carreras en el desplegable
+    async function cargarCarreras() {
+        const response = await fetch('@Url.Action("ObtenerCarreras", "Home")');
+        const carreras = await response.json();
+
+        const select = document.getElementById('carreraSeleccionada');
+        carreras.forEach(carrera => {
+            const option = document.createElement('option');
+            option.value = carrera.Id;
+            option.textContent = carrera.Descripcion;
+            select.appendChild(option);
+        });
+    }
+
+    // Cargar los parámetros de la carrera seleccionada
+    async function cargarParametrosCarrera() {
+        const carreraId = document.getElementById('carreraSeleccionada').value;
+
+        if (carreraId) {
+            const response = await fetch('@Url.Action("VerificarTiempos", "Home")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ carreraId: carreraId })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'La carrera tiene tiempos registrados y no puede ser eliminada.'
+                });
+                document.querySelector('.btn-primary').disabled = true;
+            } else {
+                document.querySelector('.btn-primary').disabled = false;
+            }
+        }
+    }
+
+    // Eliminar la carrera seleccionada
+    async function eliminarCarrera() {
+        const carreraId = document.getElementById('carreraSeleccionada').value;
+
+        if (!carreraId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Selecciona una carrera',
+                text: 'Por favor, selecciona una carrera para eliminar.'
+            });
+            return;
+        }
+
+        try {
+            const response = await fetch('@Url.Action("Baja_Carrera", "Home")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ carreraId: carreraId })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Carrera eliminada',
+                    text: 'La carrera ha sido eliminada correctamente.',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.reload();
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Hubo un problema al eliminar la carrera.'
+                });
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Ocurrió un error al intentar eliminar la carrera. Intente nuevamente.'
+            });
+        }
+    }
+
+    // Inicializar los datos cuando se cargue la página
+    document.addEventListener('DOMContentLoaded', cargarCarreras);
+</script>
