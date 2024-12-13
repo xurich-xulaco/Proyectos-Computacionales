@@ -12,6 +12,7 @@ using Cronometraje_Carreras_Deportivas.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
+using System.Globalization;
 
 
 #nullable enable
@@ -1384,43 +1385,43 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         }
 
         [HttpPost]
-public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
-{
-    try
-    {
-        string connectionString = _configuration.GetConnectionString("DefaultConnection");
-        using (SqlConnection connection = new SqlConnection(connectionString))
+        public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
         {
-            await connection.OpenAsync();
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
 
-            string updateQuery = @"
+                    string updateQuery = @"
             UPDATE CORREDOR
             SET nom_corredor = @Nombre, apP_corredor = @Apaterno, apM_corredor = @Amaterno, 
                 f_corredor = @Fnacimiento, pais = @Pais, c_corredor = @Correo
             WHERE ID_corredor = @ID";
 
-            using (SqlCommand command = new SqlCommand(updateQuery, connection))
-            {
-                command.Parameters.AddWithValue("@ID", corredor.ID_corredor);
-                command.Parameters.AddWithValue("@Nombre", corredor.Nom_corredor);
-                command.Parameters.AddWithValue("@Apaterno", corredor.apP_corredor);
-                command.Parameters.AddWithValue("@Amaterno", (object?)corredor.apM_corredor ?? DBNull.Value);
-                command.Parameters.AddWithValue("@Fnacimiento", corredor.f_corredor);
-                command.Parameters.AddWithValue("@Pais", corredor.pais_corredor);
-                command.Parameters.AddWithValue("@Correo", (object?)corredor.c_corredor ?? DBNull.Value);
+                    using (SqlCommand command = new SqlCommand(updateQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@ID", corredor.ID_corredor);
+                        command.Parameters.AddWithValue("@Nombre", corredor.Nom_corredor);
+                        command.Parameters.AddWithValue("@Apaterno", corredor.apP_corredor);
+                        command.Parameters.AddWithValue("@Amaterno", (object?)corredor.apM_corredor ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@Fnacimiento", corredor.f_corredor);
+                        command.Parameters.AddWithValue("@Pais", corredor.pais_corredor);
+                        command.Parameters.AddWithValue("@Correo", (object?)corredor.c_corredor ?? DBNull.Value);
 
-                await command.ExecuteNonQueryAsync();
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+
+                return Json(new { success = true, message = "Corredor editado correctamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al guardar edición del corredor: {ex.Message}");
+                return Json(new { success = false, message = "Error al guardar los cambios." });
             }
         }
-
-        return Json(new { success = true, message = "Corredor editado correctamente." });
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError($"Error al guardar edición del corredor: {ex.Message}");
-        return Json(new { success = false, message = "Error al guardar los cambios." });
-    }
-}
 
 
         public IActionResult Error()
@@ -1442,7 +1443,7 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
             public string Nombre { get; set; }
         }
 
-      
+
 
         [HttpGet]
         public async Task<IActionResult> BuscarEditarCorredor()
@@ -1471,7 +1472,7 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
                     }
                 }
             }
-            
+
             return Json(carreras);
         }
 
@@ -1520,7 +1521,295 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
             return Json(corredores);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Eliminar_Corredor()
+        {
+            // Obtener los datos para los menús desplegables
+            var anios = new List<int>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
 
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Cargar años
+                string aniosQuery = "SELECT DISTINCT year_carrera FROM CARRERA";
+                using (SqlCommand command = new SqlCommand(aniosQuery, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        anios.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+
+            ViewBag.Anios = anios;
+            return View();
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> EliminarCorredor(int year, int edicion, string categoria, int numero)
+        {
+            _logger.LogInformation($"Inicio del proceso para eliminar corredor: Año={year}, Edición={edicion}, Categoría={categoria}, Número={numero}");
+
+            // Validar que los parámetros sean válidos
+            if (year <= 0 || edicion <= 0 || string.IsNullOrEmpty(categoria) || numero <= 0)
+            {
+                _logger.LogError("Parámetros inválidos para eliminar corredor.");
+                return Json(new { success = false, message = "Parámetros inválidos. Verifica tu selección e inténtalo de nuevo." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    // Verificar si el corredor tiene tiempos registrados
+                    string verificarTiemposQuery = @"
+                SELECT COUNT(*)
+                FROM TIEMPO t
+                JOIN Vincula_participante vp ON t.folio_chip = vp.folio_chip
+                JOIN CARR_Cat cc ON vp.ID_Carr_cat = cc.ID_carr_cat
+                JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE ca.year_carrera = @Year
+                  AND ca.edi_carrera = @Edicion
+                  AND cat.nombre_categoria = @Categoria
+                  AND vp.num_corredor = @Numero";
+
+                    using (SqlCommand verificarCommand = new SqlCommand(verificarTiemposQuery, connection))
+                    {
+                        verificarCommand.Parameters.AddWithValue("@Year", year);
+                        verificarCommand.Parameters.AddWithValue("@Edicion", edicion);
+                        verificarCommand.Parameters.AddWithValue("@Categoria", categoria);
+                        verificarCommand.Parameters.AddWithValue("@Numero", numero);
+
+                        int tiemposRegistrados = (int)await verificarCommand.ExecuteScalarAsync();
+                        if (tiemposRegistrados > 0)
+                        {
+                            _logger.LogWarning("No se puede eliminar el corredor porque tiene tiempos registrados.");
+                            return Json(new { success = false, message = "No se puede eliminar el corredor porque tiene tiempos registrados." });
+                        }
+                    }
+
+                    // Eliminar el corredor de la tabla `Vincula_participante`
+                    string eliminarCorredorQuery = @"
+                DELETE FROM Vincula_participante
+                WHERE ID_carr_cat IN (
+                    SELECT cc.ID_carr_cat
+                    FROM CARR_Cat cc
+                    JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                    WHERE ca.year_carrera = @Year
+                      AND ca.edi_carrera = @Edicion
+                      AND cat.nombre_categoria = @Categoria
+                  )
+                  AND num_corredor = @Numero";
+
+                    using (SqlCommand eliminarCommand = new SqlCommand(eliminarCorredorQuery, connection))
+                    {
+                        eliminarCommand.Parameters.AddWithValue("@Year", year);
+                        eliminarCommand.Parameters.AddWithValue("@Edicion", edicion);
+                        eliminarCommand.Parameters.AddWithValue("@Categoria", categoria);
+                        eliminarCommand.Parameters.AddWithValue("@Numero", numero);
+
+                        int filasAfectadas = await eliminarCommand.ExecuteNonQueryAsync();
+                        if (filasAfectadas == 0)
+                        {
+                            _logger.LogWarning("No se encontró ningún corredor con los parámetros proporcionados.");
+                            return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Corredor eliminado exitosamente.");
+                return Json(new { success = true, message = "Corredor eliminado exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al eliminar el corredor: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al intentar eliminar el corredor. Inténtalo más tarde." });
+            }
+        }
+
+
+
+        [HttpGet]
+        public async Task<IActionResult> Modificar_Corredor()
+        {
+            // Obtener los datos para los menús desplegables
+            var anios = new List<int>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Cargar años
+                string aniosQuery = "SELECT DISTINCT year_carrera FROM CARRERA";
+                using (SqlCommand command = new SqlCommand(aniosQuery, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        anios.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+
+            ViewBag.Anios = anios;
+            return View();
+        }
+        [HttpPost]
+        public async Task<IActionResult> BuscarCorredor(int year, int edicion, string categoria, int numero)
+        {
+            if (string.IsNullOrEmpty(categoria))
+            {
+                return Json(new { success = false, message = "La categoría es obligatoria." });
+            }
+
+            var corredor = new Dictionary<string, string>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    string query = @"
+            SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, 
+                   c.sex_corredor, c.pais, c.c_corredor, vp.ID_corredor
+            FROM CORREDOR c
+            JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+            JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+            JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+            WHERE ca.year_carrera = @Year 
+              AND ca.edi_carrera = @Edicion 
+              AND cat.nombre_categoria = @Categoria 
+              AND vp.num_corredor = @Numero";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                corredor["Nombre"] = reader.GetString(0);
+                                corredor["ApellidoPaterno"] = reader.GetString(1);
+                                corredor["ApellidoMaterno"] = reader.GetString(2);
+                                corredor["FechaNacimiento"] = reader.GetDateTime(3).ToString("yyyy-MM-dd");
+                                corredor["Sexo"] = reader.GetString(4);
+                                corredor["Pais"] = reader.GetString(5); // Cambiado para que coincida con el JavaScript
+                                corredor["Correo"] = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                                corredor["ID_corredor"] = Convert.ToBase64String((byte[])reader["ID_corredor"]);
+                            }
+                            else
+                            {
+                                return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                            }
+                        }
+                    }
+                }
+
+                return Json(new { success = true, corredor });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error al buscar corredor: {Message}", ex.Message);
+                return Json(new { success = false, message = "Ocurrió un error al buscar el corredor." });
+            }
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> ActualizarCorredor(
+     int year, int edicion, string categoria, int numero,
+     string nombre, string apellidoPaterno, string apellidoMaterno,
+     string fechaNacimiento, string sexo, string pais, string correo)
+        {
+            _logger.LogInformation($"Parámetros recibidos: Año={year}, Edición={edicion}, Categoría={categoria}, Número={numero}, Nombre={nombre}, ApellidoPaterno={apellidoPaterno},ApellidoMaterno={apellidoMaterno}, FechaNacimiento={fechaNacimiento}");
+
+            if (year <= 0 || edicion <= 0 || string.IsNullOrEmpty(categoria) || numero <= 0)
+            {
+                _logger.LogError("Parámetros inválidos para actualizar corredor.");
+                return Json(new { success = false, message = "Parámetros inválidos. Verifica tu selección e inténtalo de nuevo." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    string updateQuery = @"
+            UPDATE CORREDOR
+            SET nom_corredor = @Nombre, 
+                apP_corredor = @ApellidoPaterno, 
+                apM_corredor = @ApellidoMaterno, 
+                f_corredor = @FechaNacimiento, 
+                sex_corredor = @Sexo, 
+                pais = @Pais, 
+                c_corredor = @Correo
+            WHERE ID_corredor = (
+                SELECT vp.ID_corredor
+                FROM Vincula_participante vp
+                JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE ca.year_carrera = @Year 
+                  AND ca.edi_carrera = @Edicion 
+                  AND cat.nombre_categoria = @Categoria 
+                  AND vp.num_corredor = @Numero
+            )";
+
+                    using (SqlCommand command = new SqlCommand(updateQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@Nombre", nombre);
+                        command.Parameters.AddWithValue("@ApellidoPaterno", apellidoPaterno);
+                        command.Parameters.AddWithValue("@ApellidoMaterno", apellidoMaterno);
+                        command.Parameters.AddWithValue("@FechaNacimiento", DateTime.Parse(fechaNacimiento));
+                        command.Parameters.AddWithValue("@Sexo", sexo);
+                        command.Parameters.AddWithValue("@Pais", pais);
+                        command.Parameters.AddWithValue("@Correo", correo);
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+                        if (rowsAffected > 0)
+                        {
+                            _logger.LogInformation("Información del corredor actualizada exitosamente.");
+                            return Json(new { success = true, message = "Información del corredor actualizada exitosamente." });
+                        }
+                        else
+                        {
+                            _logger.LogWarning("No se encontró el corredor con los parámetros proporcionados.");
+                            return Json(new { success = false, message = "No se encontró el corredor con los parámetros proporcionados." });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al actualizar el corredor: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al intentar actualizar la información del corredor. Inténtalo más tarde." });
+            }
+        }
 
         [HttpGet]
         public async Task<IActionResult> Importar_Corredores()
@@ -1534,15 +1823,15 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
                 {
                     await connection.OpenAsync();
                     string query = @"
-        SELECT 
-            ca.ID_carrera,
-            CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
-                   '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
-        FROM CARRERA ca
-        JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
-        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-        GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
-        ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+SELECT 
+    ca.ID_carrera,
+    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
+           '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+FROM CARRERA ca
+JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     using (SqlDataReader reader = await command.ExecuteReaderAsync())
@@ -1611,11 +1900,33 @@ public async Task<IActionResult> GuardarEdicionCorredor(Corredor corredor)
                                     continue;
                                 }
 
-                                if (!DateTime.TryParse(fecha_cumpleanios_celda.GetString(), out var fechaCumpleanios))
+                                if (fecha_cumpleanios_celda.TryGetValue(out DateTime fechaCumpleanios))
                                 {
-                                    _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento no válida.");
-                                    errores++;
-                                    continue;
+                                    // La celda ya es de tipo fecha y se puede procesar directamente
+                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
+                                    {
+                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
+                                        errores++;
+                                        continue;
+                                    }
+                                }
+                                else
+                                {
+                                    var fechaTexto = fecha_cumpleanios_celda.GetString().Trim();
+                                    if (!DateTime.TryParseExact(fechaTexto, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out fechaCumpleanios))
+                                    {
+                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaTexto}' no válida. Asegúrese de usar el formato ISO 8601 (YYYY-MM-DD).");
+                                        errores++;
+                                        continue;
+                                    }
+
+                                    // Validar rango nuevamente
+                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
+                                    {
+                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
+                                        errores++;
+                                        continue;
+                                    }
                                 }
 
                                 _logger.LogInformation($"Procesando fila {fila.RowNumber()}: {nom_corredor} {apellido_paterno}.");
