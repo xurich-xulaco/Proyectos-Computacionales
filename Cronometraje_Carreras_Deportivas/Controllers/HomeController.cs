@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Cronometraje_Carreras_Deportivas.Data;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 
 #nullable enable
@@ -552,114 +553,123 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Verificar si el corredor ya existe
-                    string checkSql = @"
-                SELECT COUNT(*) 
-                FROM CORREDOR 
-                WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
-                  AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
-                  AND f_corredor = @Fnacimiento";
-
-                    using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
+                    // Iniciar una transacción
+                    using (SqlTransaction transaction = connection.BeginTransaction())
                     {
-                        checkCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                        checkCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        checkCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                        checkCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-
-                        if ((int)await checkCommand.ExecuteScalarAsync() > 0)
+                        try
                         {
-                            return Json(new { success = false, message = "El corredor ya está registrado." });
+                            // Verificar si el corredor ya existe
+                            string checkSql = @"SELECT COUNT(*) 
+                                                 FROM CORREDOR 
+                                                 WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
+                                                   AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
+                                                   AND f_corredor = @Fnacimiento";
+
+                            using (SqlCommand checkCommand = new SqlCommand(checkSql, connection, transaction))
+                            {
+                                checkCommand.Parameters.AddWithValue("@Nombre", Nombre);
+                                checkCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
+                                checkCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
+                                checkCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+
+                                if ((int)await checkCommand.ExecuteScalarAsync() > 0)
+                                {
+                                    transaction.Rollback();
+                                    return Json(new { success = false, message = "El corredor ya está registrado." });
+                                }
+                            }
+
+                            // Insertar nuevo corredor
+                            string insertCorredorSql = @"INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
+                                                                             f_corredor, sex_corredor, c_corredor, pais) 
+                                                         OUTPUT INSERTED.ID_corredor
+                                                         VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
+
+                            byte[] corredorId;
+                            using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection, transaction))
+                            {
+                                insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
+                                insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
+                                insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
+                                insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+                                insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
+                                insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
+                                insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
+
+                                corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
+                            }
+
+                            // Insertar número de teléfono si se proporciona
+                            if (!string.IsNullOrEmpty(Telefono))
+                            {
+                                string insertTelefonoSql = @"INSERT INTO TELEFONO (numero, ID_corredor) VALUES (@Numero, @IDCorredor)";
+
+                                using (SqlCommand telefonoCommand = new SqlCommand(insertTelefonoSql, connection, transaction))
+                                {
+                                    telefonoCommand.Parameters.AddWithValue("@Numero", Telefono);
+                                    telefonoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+                                    await telefonoCommand.ExecuteNonQueryAsync();
+                                }
+                            }
+
+                            // Obtener ID de la categoría
+                            string getCategoriaSql = @"SELECT ID_categoria 
+                                                     FROM CATEGORIA 
+                                                     WHERE nombre_categoria = @CategoriaNombre";
+
+                            int? idCategoria = null;
+                            using (SqlCommand getCategoriaCommand = new SqlCommand(getCategoriaSql, connection, transaction))
+                            {
+                                getCategoriaCommand.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
+                                idCategoria = (int?)await getCategoriaCommand.ExecuteScalarAsync();
+                            }
+
+                            if (!idCategoria.HasValue)
+                            {
+                                transaction.Rollback();
+                                return Json(new { success = false, message = "Categoría seleccionada no válida." });
+                            }
+
+                            // Obtener ID de la combinación Carrera-Categoría
+                            string getCarrCatSql = @"SELECT ID_carr_cat 
+                                                     FROM CARR_CAT 
+                                                     WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
+
+                            int? idCarrCat = null;
+                            using (SqlCommand getCarrCatCommand = new SqlCommand(getCarrCatSql, connection, transaction))
+                            {
+                                getCarrCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
+                                getCarrCatCommand.Parameters.AddWithValue("@IDCategoria", idCategoria.Value);
+                                idCarrCat = (int?)await getCarrCatCommand.ExecuteScalarAsync();
+                            }
+
+                            if (!idCarrCat.HasValue)
+                            {
+                                transaction.Rollback();
+                                return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
+                            }
+
+                            // Insertar en Vincula_participante
+                            string insertVinculoSql = @"INSERT INTO Vincula_participante (ID_vinculo, ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
+                                                         VALUES (NEWID(), @CorredorId, @IDCarrCat,
+                                                                 (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
+                                                                 'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
+
+                            using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection, transaction))
+                            {
+                                vinculoCommand.Parameters.AddWithValue("@CorredorId", corredorId);
+                                vinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
+                                await vinculoCommand.ExecuteNonQueryAsync();
+                            }
+
+                            // Confirmar la transacción
+                            transaction.Commit();
                         }
-                    }
-
-                    // Insertar nuevo corredor
-                    string insertCorredorSql = @"
-                INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
-                                      f_corredor, sex_corredor, c_corredor, pais) 
-                OUTPUT INSERTED.ID_corredor
-                VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
-
-                    byte[] corredorId;
-                    using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection))
-                    {
-                        insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                        insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                        insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                        insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
-                        insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
-                        insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
-
-                        corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
-                    }
-
-                    // Insertar número de teléfono si se proporciona
-                    if (!string.IsNullOrEmpty(Telefono))
-                    {
-                        string insertTelefonoSql = @"
-                    INSERT INTO TELEFONO (numero, ID_corredor)
-                    VALUES (@Numero, @IDCorredor)";
-
-                        using (SqlCommand telefonoCommand = new SqlCommand(insertTelefonoSql, connection))
+                        catch (Exception)
                         {
-                            telefonoCommand.Parameters.AddWithValue("@Numero", Telefono);
-                            telefonoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
-
-                            await telefonoCommand.ExecuteNonQueryAsync();
+                            transaction.Rollback();
+                            throw;
                         }
-                    }
-
-                    string getCategoriaSql = @"
-                SELECT ID_categoria 
-                FROM CATEGORIA 
-                WHERE nombre_categoria = @CategoriaNombre";
-
-                    int? idCategoria = null;
-                    using (SqlCommand getCategoriaCommand = new SqlCommand(getCategoriaSql, connection))
-                    {
-                        getCategoriaCommand.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
-
-                        idCategoria = (int?)await getCategoriaCommand.ExecuteScalarAsync();
-                    }
-
-                    if (!idCategoria.HasValue)
-                    {
-                        return Json(new { success = false, message = "Categoría seleccionada no válida." });
-                    }
-
-                    string getCarrCatSql = @"
-                SELECT ID_carr_cat 
-                FROM CARR_CAT 
-                WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
-
-                    int? idCarrCat = null;
-                    using (SqlCommand getCarrCatCommand = new SqlCommand(getCarrCatSql, connection))
-                    {
-                        getCarrCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
-                        getCarrCatCommand.Parameters.AddWithValue("@IDCategoria", idCategoria.Value);
-
-                        idCarrCat = (int?)await getCarrCatCommand.ExecuteScalarAsync();
-                    }
-
-                    if (!idCarrCat.HasValue)
-                    {
-                        return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
-                    }
-
-                    string insertVinculoSql = @"
-                INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
-                VALUES (@CorredorId, 
-                        @IDCarrCat,
-                        (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
-                        'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
-
-                    using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection))
-                    {
-                        vinculoCommand.Parameters.AddWithValue("@CorredorId", corredorId);
-                        vinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
-
-                        await vinculoCommand.ExecuteNonQueryAsync();
                     }
                 }
 
@@ -672,6 +682,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return Json(new { success = false, message = "Ocurrió un error al crear el corredor." });
             }
         }
+
 
 
         [HttpGet]
@@ -708,8 +719,14 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerDetalleCorredorPorNumero(int numero)
+        public async Task<IActionResult> ObtenerDetalleCorredorPorNumero(
+
+    int numero, int year, int edicion, string categoria)
         {
+            // Log inicial para depurar los parámetros recibidos
+            _logger.LogInformation("Iniciando búsqueda del corredor...");
+            _logger.LogInformation($"Parámetros recibidos: Numero={numero}, Year={year}, Edicion={edicion}, Categoria={categoria}");
+
             var detalles = new
             {
                 Success = false,
@@ -729,21 +746,40 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
+                    _logger.LogInformation("Conexión a la base de datos abierta.");
 
+                    // Consulta SQL ajustada
                     string query = @"
-                SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, c.sex_corredor, c.pais, c.c_corredor
+                SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, 
+                       c.f_corredor, c.sex_corredor, c.pais, c.c_corredor
                 FROM CORREDOR c
                 INNER JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
-                WHERE vp.num_corredor = @Numero";
+                INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                INNER JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                INNER JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE vp.num_corredor = @Numero
+                  AND ca.year_carrera = @Year
+                  AND ca.edi_carrera = @Edicion
+                  AND cat.nombre_categoria = @Categoria";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
+                        // Asignar parámetros
                         command.Parameters.AddWithValue("@Numero", numero);
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+
+                        _logger.LogInformation("Consulta SQL preparada con los parámetros:");
+                        _logger.LogInformation($"@Numero={numero}, @Year={year}, @Edicion={edicion}, @Categoria={categoria}");
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
+                                _logger.LogInformation("Corredor encontrado en la base de datos.");
+
+                                // Extraer datos del corredor
                                 detalles = new
                                 {
                                     Success = true,
@@ -755,6 +791,13 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                                     Pais = reader.GetString(5),
                                     Correo = reader.IsDBNull(6) ? "" : reader.GetString(6)
                                 };
+
+                                // Log de los datos obtenidos
+                                _logger.LogInformation($"Detalles obtenidos: {detalles}");
+                            }
+                            else
+                            {
+                                _logger.LogWarning("No se encontró ningún corredor con los parámetros proporcionados.");
                             }
                         }
                     }
@@ -762,98 +805,14 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
             catch (Exception ex)
             {
+                // Log de error
                 _logger.LogError($"Error al buscar detalles del corredor: {ex.Message}");
             }
 
+            // Log final
+            _logger.LogInformation("Proceso de búsqueda finalizado.");
             return Json(detalles);
         }
-        [HttpGet]
-        public async Task<IActionResult> Eliminar_Corredor()
-        {
-            var years = new List<int>();
-            string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    // Consulta para obtener los años disponibles
-                    string query = "SELECT DISTINCT year_carrera FROM CARRERA ORDER BY year_carrera DESC";
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            years.Add(reader.GetInt32(0));
-                        }
-                    }
-                }
-
-                // Pasar los años al ViewBag para cargarlos en el dropdown
-                ViewBag.Years = years;
-
-                return View();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al cargar los años para Eliminar_Corredor: {ex.Message}");
-                return View("Error");
-            }
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> EliminarCorredor([FromBody] dynamic data)
-        {
-            int numero = data.numero;
-            string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    // Verificar si tiene tiempos registrados
-                    string checkTiemposQuery = @"
-            SELECT COUNT(*) 
-            FROM TIEMPO 
-            WHERE folio_chip = (SELECT folio_chip FROM Vincula_participante WHERE num_corredor = @Numero)";
-
-                    using (SqlCommand checkCommand = new SqlCommand(checkTiemposQuery, connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@Numero", numero);
-                        int tiempos = (int)await checkCommand.ExecuteScalarAsync();
-                        if (tiempos > 0)
-                        {
-                            return Json(new { success = false, message = "El corredor tiene tiempos registrados." });
-                        }
-                    }
-
-                    // Eliminar registros relacionados
-                    string deleteQuery = @"
-            DELETE FROM TELEFONO WHERE ID_corredor = (SELECT ID_corredor FROM Vincula_participante WHERE num_corredor = @Numero);
-            DELETE FROM Vincula_participante WHERE num_corredor = @Numero;
-            DELETE FROM CORREDOR WHERE ID_corredor = (SELECT ID_corredor FROM Vincula_participante WHERE num_corredor = @Numero);";
-
-                    using (SqlCommand deleteCommand = new SqlCommand(deleteQuery, connection))
-                    {
-                        deleteCommand.Parameters.AddWithValue("@Numero", numero);
-                        await deleteCommand.ExecuteNonQueryAsync();
-                    }
-                }
-
-                return Json(new { success = true, message = "Corredor eliminado exitosamente." });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al eliminar corredor: {ex.Message}");
-                return Json(new { success = false, message = "Error al intentar eliminar el corredor." });
-            }
-        }
-
-
 
         [HttpGet]
         public async Task<IActionResult> ObtenerCorredores(int year, int edicion, string categoria)
@@ -916,10 +875,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
             return Json(corredores);
         }
-
-
-
-
 
         [HttpGet]
         public async Task<IActionResult> Crear_Carrera()
@@ -1277,8 +1232,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
-        
-
         [HttpGet]
         public async Task<IActionResult> Editar_Carrera()
         {
@@ -1465,11 +1418,358 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             return Json(resultado);
         }
 
-
-        public IActionResult Error()
+        [HttpGet]
+        public async Task<IActionResult> Eliminar_Corredor()
         {
+            // Obtener los datos para los menús desplegables
+            var anios = new List<int>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Cargar años
+                string aniosQuery = "SELECT DISTINCT year_carrera FROM CARRERA";
+                using (SqlCommand command = new SqlCommand(aniosQuery, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        anios.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+
+            ViewBag.Anios = anios;
             return View();
         }
+
+        [HttpPost]
+        public async Task<IActionResult> BuscarCorredor(int year, int edicion, string categoria, int numero)
+        {
+            if (string.IsNullOrEmpty(categoria))
+            {
+                return Json(new { success = false, message = "La categoría es obligatoria." });
+            }
+
+            var corredor = new Dictionary<string, string>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    string query = @"
+                SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, 
+                       c.sex_corredor, c.pais, c.c_corredor, vp.ID_corredor
+                FROM CORREDOR c
+                JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+                JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE ca.year_carrera = @Year 
+                  AND ca.edi_carrera = @Edicion 
+                  AND cat.nombre_categoria = @Categoria 
+                  AND vp.num_corredor = @Numero";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                corredor["Nombre"] = reader.GetString(0);
+                                corredor["ApellidoPaterno"] = reader.GetString(1);
+                                corredor["ApellidoMaterno"] = reader.GetString(2);
+                                corredor["FechaNacimiento"] = reader.GetDateTime(3).ToString("yyyy-MM-dd");
+                                corredor["Sexo"] = reader.GetString(4);
+                                corredor["Pais"] = reader.GetString(5);
+                                corredor["Correo"] = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                                corredor["ID_corredor"] = Convert.ToBase64String((byte[])reader["ID_corredor"]);
+                            }
+                            else
+                            {
+                                return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                            }
+                        }
+                    }
+                }
+
+                return Json(new { success = true, corredor });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error al buscar corredor: {Message}", ex.Message);
+                return Json(new { success = false, message = "Ocurrió un error al buscar el corredor." });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> EliminarCorredor(int year, int edicion, string categoria, int numero)
+        {
+            _logger.LogInformation($"Inicio del proceso para eliminar corredor: Año={year}, Edición={edicion}, Categoría={categoria}, Número={numero}");
+
+            // Validar que los parámetros sean válidos
+            if (year <= 0 || edicion <= 0 || string.IsNullOrEmpty(categoria) || numero <= 0)
+            {
+                _logger.LogError("Parámetros inválidos para eliminar corredor.");
+                return Json(new { success = false, message = "Parámetros inválidos. Verifica tu selección e inténtalo de nuevo." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    // Verificar si el corredor tiene tiempos registrados
+                    string verificarTiemposQuery = @"
+                SELECT COUNT(*)
+                FROM TIEMPO t
+                JOIN Vincula_participante vp ON t.folio_chip = vp.folio_chip
+                JOIN CARR_Cat cc ON vp.ID_Carr_cat = cc.ID_carr_cat
+                JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE ca.year_carrera = @Year
+                  AND ca.edi_carrera = @Edicion
+                  AND cat.nombre_categoria = @Categoria
+                  AND vp.num_corredor = @Numero";
+
+                    using (SqlCommand verificarCommand = new SqlCommand(verificarTiemposQuery, connection))
+                    {
+                        verificarCommand.Parameters.AddWithValue("@Year", year);
+                        verificarCommand.Parameters.AddWithValue("@Edicion", edicion);
+                        verificarCommand.Parameters.AddWithValue("@Categoria", categoria);
+                        verificarCommand.Parameters.AddWithValue("@Numero", numero);
+
+                        int tiemposRegistrados = (int)await verificarCommand.ExecuteScalarAsync();
+                        if (tiemposRegistrados > 0)
+                        {
+                            _logger.LogWarning("No se puede eliminar el corredor porque tiene tiempos registrados.");
+                            return Json(new { success = false, message = "No se puede eliminar el corredor porque tiene tiempos registrados." });
+                        }
+                    }
+
+                    // Eliminar el corredor de la tabla `Vincula_participante`
+                    string eliminarCorredorQuery = @"
+                DELETE FROM Vincula_participante
+                WHERE ID_carr_cat IN (
+                    SELECT cc.ID_carr_cat
+                    FROM CARR_Cat cc
+                    JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                    WHERE ca.year_carrera = @Year
+                      AND ca.edi_carrera = @Edicion
+                      AND cat.nombre_categoria = @Categoria
+                  )
+                  AND num_corredor = @Numero";
+
+                    using (SqlCommand eliminarCommand = new SqlCommand(eliminarCorredorQuery, connection))
+                    {
+                        eliminarCommand.Parameters.AddWithValue("@Year", year);
+                        eliminarCommand.Parameters.AddWithValue("@Edicion", edicion);
+                        eliminarCommand.Parameters.AddWithValue("@Categoria", categoria);
+                        eliminarCommand.Parameters.AddWithValue("@Numero", numero);
+
+                        int filasAfectadas = await eliminarCommand.ExecuteNonQueryAsync();
+                        if (filasAfectadas == 0)
+                        {
+                            _logger.LogWarning("No se encontró ningún corredor con los parámetros proporcionados.");
+                            return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Corredor eliminado exitosamente.");
+                return Json(new { success = true, message = "Corredor eliminado exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al eliminar el corredor: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al intentar eliminar el corredor. Inténtalo más tarde." });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Modificar_Corredor()
+        {
+            // Obtener los datos para los menús desplegables
+            var anios = new List<int>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Cargar años
+                string aniosQuery = "SELECT DISTINCT year_carrera FROM CARRERA";
+                using (SqlCommand command = new SqlCommand(aniosQuery, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        anios.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+
+            ViewBag.Anios = anios;
+            return View();
+        }
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> EditarCorredor(
+    int numero, string nombre, string apellidoPaterno, string apellidoMaterno,
+    DateTime fechaNacimiento, string sexo, string pais, string correo,
+    int? nuevaCarreraId, string nuevaCategoria)
+        {
+            _logger.LogInformation($"Iniciando actualización del corredor con número {numero}");
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // 1. Buscar el ID_corredor basado en el número
+                            string getCorredorIdQuery = @"
+                        SELECT c.ID_corredor, vp.ID_carr_cat 
+                        FROM CORREDOR c
+                        INNER JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+                        WHERE vp.num_corredor = @Numero";
+
+                            byte[] idCorredor = null;
+                            int idCarrCatActual = 0;
+
+                            using (SqlCommand command = new SqlCommand(getCorredorIdQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@Numero", numero);
+                                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                                {
+                                    if (await reader.ReadAsync())
+                                    {
+                                        idCorredor = (byte[])reader["ID_corredor"];
+                                        idCarrCatActual = reader.GetInt32(1);
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("No se encontró el corredor.");
+                                        return Json(new { success = false, message = "Corredor no encontrado." });
+                                    }
+                                }
+                            }
+
+                            // 2. Actualizar la tabla CORREDOR
+                            string updateCorredorQuery = @"
+                        UPDATE CORREDOR
+                        SET nom_corredor = @Nombre, apP_corredor = @ApellidoPaterno, 
+                            apM_corredor = @ApellidoMaterno, f_corredor = @FechaNacimiento, 
+                            sex_corredor = @Sexo, pais = @Pais, c_corredor = @Correo
+                        WHERE ID_corredor = @ID_corredor";
+
+                            using (SqlCommand command = new SqlCommand(updateCorredorQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@Nombre", nombre);
+                                command.Parameters.AddWithValue("@ApellidoPaterno", apellidoPaterno);
+                                command.Parameters.AddWithValue("@ApellidoMaterno", apellidoMaterno);
+                                command.Parameters.AddWithValue("@FechaNacimiento", fechaNacimiento);
+                                command.Parameters.AddWithValue("@Sexo", sexo);
+                                command.Parameters.AddWithValue("@Pais", pais);
+                                command.Parameters.AddWithValue("@Correo", (object)correo ?? DBNull.Value);
+                                command.Parameters.AddWithValue("@ID_corredor", idCorredor);
+
+                                await command.ExecuteNonQueryAsync();
+                            }
+
+                            // 3. Verificar si hay cambio en carrera/categoría y actualizar Vincula_participante
+                            if (nuevaCarreraId.HasValue && !string.IsNullOrEmpty(nuevaCategoria))
+                            {
+                                // Obtener el nuevo ID_carr_cat
+                                string getNuevoCarrCatQuery = @"
+                            SELECT ID_carr_cat 
+                            FROM CARR_Cat cc
+                            INNER JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                            WHERE cc.ID_carrera = @NuevaCarreraId AND cat.nombre_categoria = @NuevaCategoria";
+
+                                int nuevoIdCarrCat = 0;
+                                using (SqlCommand command = new SqlCommand(getNuevoCarrCatQuery, connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@NuevaCarreraId", nuevaCarreraId.Value);
+                                    command.Parameters.AddWithValue("@NuevaCategoria", nuevaCategoria);
+
+                                    object result = await command.ExecuteScalarAsync();
+                                    if (result != null)
+                                    {
+                                        nuevoIdCarrCat = (int)result;
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("No se encontró la nueva combinación de carrera y categoría.");
+                                        return Json(new { success = false, message = "La nueva carrera o categoría no es válida." });
+                                    }
+                                }
+
+                                // Actualizar Vincula_participante solo si el ID_carr_cat es diferente
+                                if (nuevoIdCarrCat != idCarrCatActual)
+                                {
+                                    string updateVinculaQuery = @"
+                                UPDATE Vincula_participante
+                                SET ID_carr_cat = @NuevoIdCarrCat
+                                WHERE ID_corredor = @ID_corredor";
+
+                                    using (SqlCommand command = new SqlCommand(updateVinculaQuery, connection, transaction))
+                                    {
+                                        command.Parameters.AddWithValue("@NuevoIdCarrCat", nuevoIdCarrCat);
+                                        command.Parameters.AddWithValue("@ID_corredor", idCorredor);
+                                        await command.ExecuteNonQueryAsync();
+                                    }
+                                }
+                            }
+
+                            // Commit de la transacción
+                            transaction.Commit();
+                            _logger.LogInformation("Corredor actualizado exitosamente.");
+                            return Json(new { success = true, message = "Corredor actualizado correctamente." });
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            _logger.LogError($"Error durante la actualización: {ex.Message}");
+                            return Json(new { success = false, message = "Error durante la actualización del corredor." });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error general: {ex.Message}");
+                return Json(new { success = false, message = "Error inesperado. Inténtalo más tarde." });
+            }
+        }
+
+
+
+
+
+
+
 
         public class DatosCarrera
         {
@@ -1485,6 +1785,29 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             public string Nombre { get; set; }
         }
 
-
+        public class CorredorViewModel
+        {
+            public string ID { get; set; }
+            public string Nombre { get; set; }
+            public string Pais { get; set; }
+            public string Sexo { get; set; }
+            public string FechaNacimiento { get; set; }
+        }
+        public class EditarCorredorViewModel
+        {
+            public string Nombre { get; set; }
+            public string ApellidoPaterno { get; set; }
+            public string ApellidoMaterno { get; set; }
+            public string FechaNacimiento { get; set; } // Formato yyyy-MM-dd
+            public string Sexo { get; set; }
+            public string Pais { get; set; }
+            public string Correo { get; set; } // Campo opcional
+            public int Year { get; set; }
+            public int Edicion { get; set; }
+            public string Categoria { get; set; }
+            public int Numero { get; set; }
+            public int Carrera { get; set; } // ID de la nueva carrera seleccionada
+            public string NuevaCategoria { get; set; } // Nombre de la nueva categoría seleccionada
+        }
     }
 }
