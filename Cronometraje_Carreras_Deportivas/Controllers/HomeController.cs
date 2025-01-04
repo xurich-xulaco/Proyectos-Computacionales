@@ -547,124 +547,126 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Verificar si el corredor ya existe
-                    string checkSql = @"
-                SELECT COUNT(*) 
-                FROM CORREDOR 
-                WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
-                  AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
-                  AND f_corredor = @Fnacimiento";
-
-                    using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
+                    // Intentar insertar el corredor (si ya existe, se lanzará una excepción)
+                    byte[]? corredorId = null;
+                    try
                     {
-                        checkCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                        checkCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        checkCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                        checkCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+                        string insertCorredorSql = @"
+                    INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
+                                          f_corredor, sex_corredor, c_corredor, pais) 
+                    OUTPUT INSERTED.ID_corredor
+                    VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
 
-                        if ((int)await checkCommand.ExecuteScalarAsync() > 0)
+                        using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection))
                         {
-                            return Json(new { success = false, message = "El corredor ya está registrado." });
+                            insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
+                            insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
+                            insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
+                            insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+                            insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
+                            insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
+                            insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
+
+                            corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
+                        }
+                    }
+                    catch (SqlException ex) when (ex.Number == 2627) // Error de clave duplicada
+                    {
+                        // Si ocurre un duplicado, obtener el ID del corredor existente
+                        string getCorredorSql = @"
+                    SELECT ID_corredor 
+                    FROM CORREDOR 
+                    WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
+                      AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
+                      AND f_corredor = @Fnacimiento";
+
+                        using (SqlCommand getCorredorCommand = new SqlCommand(getCorredorSql, connection))
+                        {
+                            getCorredorCommand.Parameters.AddWithValue("@Nombre", Nombre);
+                            getCorredorCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
+                            getCorredorCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
+                            getCorredorCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+
+                            corredorId = (byte[]?)await getCorredorCommand.ExecuteScalarAsync();
                         }
                     }
 
-                    // Insertar nuevo corredor
-                    string insertCorredorSql = @"
-                INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
-                                      f_corredor, sex_corredor, c_corredor, pais) 
-                OUTPUT INSERTED.ID_corredor
-                VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
+                    if (corredorId == null)
+                        return Json(new { success = false, message = "No se pudo obtener o crear el corredor." });
 
-                    byte[] corredorId;
-                    using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection))
-                    {
-                        insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                        insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                        insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                        insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                        insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
-                        insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
-                        insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
-
-                        corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
-                    }
-
-                    // Insertar número de teléfono si se proporciona
-                    if (!string.IsNullOrEmpty(Telefono))
-                    {
-                        string insertTelefonoSql = @"
-                    INSERT INTO TELEFONO (numero, ID_corredor)
-                    VALUES (@Numero, @IDCorredor)";
-
-                        using (SqlCommand telefonoCommand = new SqlCommand(insertTelefonoSql, connection))
-                        {
-                            telefonoCommand.Parameters.AddWithValue("@Numero", Telefono);
-                            telefonoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
-
-                            await telefonoCommand.ExecuteNonQueryAsync();
-                        }
-                    }
-
+                    // Verificar existencia de la categoría
                     string getCategoriaSql = @"
                 SELECT ID_categoria 
                 FROM CATEGORIA 
                 WHERE nombre_categoria = @CategoriaNombre";
 
-                    int? idCategoria = null;
+                    int? idCategoria;
                     using (SqlCommand getCategoriaCommand = new SqlCommand(getCategoriaSql, connection))
                     {
                         getCategoriaCommand.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
-
                         idCategoria = (int?)await getCategoriaCommand.ExecuteScalarAsync();
                     }
 
                     if (!idCategoria.HasValue)
-                    {
                         return Json(new { success = false, message = "Categoría seleccionada no válida." });
-                    }
 
+                    // Verificar existencia de la combinación Carrera-Categoría
                     string getCarrCatSql = @"
                 SELECT ID_carr_cat 
-                FROM CARR_CAT 
+                FROM CARR_Cat 
                 WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
 
-                    int? idCarrCat = null;
+                    int? idCarrCat;
                     using (SqlCommand getCarrCatCommand = new SqlCommand(getCarrCatSql, connection))
                     {
                         getCarrCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
                         getCarrCatCommand.Parameters.AddWithValue("@IDCategoria", idCategoria.Value);
-
                         idCarrCat = (int?)await getCarrCatCommand.ExecuteScalarAsync();
                     }
 
                     if (!idCarrCat.HasValue)
-                    {
                         return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
+
+                    // Verificar si el corredor ya está vinculado a esta Carrera-Categoría
+                    string checkVinculoSql = @"
+                SELECT COUNT(*) 
+                FROM Vincula_participante 
+                WHERE ID_corredor = @IDCorredor AND ID_carr_cat = @IDCarrCat";
+
+                    using (SqlCommand checkVinculoCommand = new SqlCommand(checkVinculoSql, connection))
+                    {
+                        checkVinculoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+                        checkVinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
+
+                        if ((int)await checkVinculoCommand.ExecuteScalarAsync() > 0)
+                        {
+                            return Json(new { success = false, message = "El corredor ya está asociado a esta carrera." });
+                        }
                     }
 
+                    // Insertar vínculo
                     string insertVinculoSql = @"
                 INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
-                VALUES (@CorredorId, 
+                VALUES (@IDCorredor, 
                         @IDCarrCat,
                         (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
                         'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
 
                     using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection))
                     {
-                        vinculoCommand.Parameters.AddWithValue("@CorredorId", corredorId);
+                        vinculoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
                         vinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
 
                         await vinculoCommand.ExecuteNonQueryAsync();
                     }
                 }
 
-                // Respuesta de éxito
-                return Json(new { success = true, message = "Corredor creado exitosamente." });
+                return Json(new { success = true, message = "Corredor vinculado exitosamente a la nueva carrera." });
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al crear el corredor: {ex.Message}");
-                return Json(new { success = false, message = "Ocurrió un error al crear el corredor." });
+                _logger.LogError($"Error al vincular el corredor: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al vincular el corredor." });
             }
         }
 
