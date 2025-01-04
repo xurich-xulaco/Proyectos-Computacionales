@@ -1973,6 +1973,203 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
             _logger.LogError("La ruta del archivo no es válida o no existe.");
             return Json(new { success = false, message = "La ruta del archivo no es válida." });
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Reporte_Corredor()
+        {
+            var anios = new List<int>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Cargar años de carreras
+                string aniosQuery = "SELECT DISTINCT year_carrera FROM CARRERA";
+                using (SqlCommand command = new SqlCommand(aniosQuery, connection))
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        anios.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+
+            ViewBag.Anios = anios;
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GenerarReporteCorredor(int year, int edicion, string categoria, int numero, string rutaArchivo)
+        {
+            try
+            {
+                // Separar la ruta del archivo y verificar el directorio
+                var directorio = Path.GetDirectoryName(rutaArchivo);
+                var archivo = Path.GetFileName(rutaArchivo);
+
+                if (string.IsNullOrEmpty(directorio) || string.IsNullOrEmpty(archivo))
+                {
+                    return Json(new { success = false, message = "La ruta proporcionada no es válida." });
+                }
+
+                // Verificar si el directorio existe
+                if (!Directory.Exists(directorio))
+                {
+                    return Json(new { success = false, message = "El directorio especificado no existe." });
+                }
+
+                // Verificar si el archivo ya existe
+                if (System.IO.File.Exists(rutaArchivo))
+                {
+                    return Json(new { success = false, message = "El archivo ya existe. No se desea sobrescribir." });
+                }
+
+                _logger.LogInformation($"Generando reporte desde la ruta: {rutaArchivo}");
+
+                // Crear conexión a la base de datos
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                List<string> carreras = new List<string>();
+                string corredorInfo;
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    // Consultar los datos básicos del corredor
+                    string queryCorredor = @"
+            SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, c.sex_corredor, 
+                   c.pais, c.c_corredor
+            FROM CORREDOR c
+            JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+            JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+            JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+            WHERE ca.year_carrera = @Year 
+              AND ca.edi_carrera = @Edicion 
+              AND cat.nombre_categoria = @Categoria 
+              AND vp.num_corredor = @Numero";
+
+                    using (SqlCommand command = new SqlCommand(queryCorredor, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                corredorInfo = $@"Nombre: {reader.GetString(0)} {reader.GetString(1)} {reader.GetString(2)}
+Fecha de nacimiento: {reader.GetDateTime(3):yyyy-MM-dd}
+Sexo del corredor: {reader.GetString(4)}
+Correo del corredor: {(reader.IsDBNull(6) ? "N/A" : reader.GetString(6))}";
+                            }
+                            else
+                            {
+                                return Json(new { success = false, message = "No se encontró información del corredor." });
+                            }
+                        }
+                    }
+
+                    // Consultar las carreras del corredor
+                    string queryCarreras = @"
+WITH TiemposCorredor AS (
+    SELECT 
+        folio_chip,
+        tiempo_registrado,
+        ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+    FROM dbo.TIEMPO
+),
+Posiciones AS (
+    SELECT 
+        RANK() OVER (ORDER BY 
+            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+        ) AS Posicion,
+        ca.nom_carrera AS NombreCarrera,
+        ca.edi_carrera AS Edicion,
+        cat.nombre_categoria AS Categoria,
+        v.num_corredor AS NumCorredor,
+        COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+        COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+        COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+        CONVERT(TIME, DATEADD(SECOND, 
+            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+            0
+        )) AS TiempoTotal
+    FROM CARRERA ca
+    JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
+    JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
+    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    WHERE ca.year_carrera = @Year 
+      AND ca.edi_carrera = @Edicion 
+      AND cat.nombre_categoria = @Categoria
+      AND v.num_corredor = @Numero
+)
+SELECT Posicion, NombreCarrera, Edicion, Categoria, T1, T2, T3, TiempoTotal
+FROM Posiciones;";
+                    using (SqlCommand command = new SqlCommand(queryCarreras, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                // Obtener los datos de cada carrera
+                                string posicion = reader["Posicion"].ToString();
+                                string nombreCarrera = reader["NombreCarrera"].ToString();
+                                string edicionCarrera = reader["Edicion"].ToString();
+                                string categoriaCarrera = reader["Categoria"].ToString();
+                                string tiempo1 = reader["T1"].ToString();
+                                string tiempo2 = reader["T2"].ToString();
+                                string tiempo3 = reader["T3"].ToString();
+                                string tiempoTotal = reader["TiempoTotal"].ToString();
+
+                                // Agregar la información de la carrera a la lista
+                                carreras.Add($@"Posición: {posicion}
+                                Nombre de la carrera: {nombreCarrera}
+                                Edición: {edicionCarrera}
+                                Categoría: {categoriaCarrera}
+                                Tiempo 1: {tiempo1}
+                                Tiempo 2: {tiempo2}
+                                Tiempo 3: {tiempo3}
+                                Tiempo Total: {tiempoTotal}");
+                            }
+                        }
+                    }
+                }
+
+                // Generar el contenido del archivo
+                string contenidoReporte = corredorInfo + "\n\n" + string.Join("\n\n", carreras);
+
+                // Crear el archivo
+                await System.IO.File.WriteAllTextAsync(rutaArchivo, contenidoReporte);
+
+                return Json(new { success = true, message = "El reporte se generó exitosamente en la ruta especificada." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al generar el reporte. Ruta: {RutaArchivo}, Parámetros: Year={Year}, Edicion={Edicion}, Categoria={Categoria}, Numero={Numero}", rutaArchivo, year, edicion, categoria, numero);
+                _logger.LogError(ex, $"Error al generar el reporte: {ex.Message}");
+                return Json(new { success = false, message = "Ocurrió un error al generar el reporte." });
+            }
+        }
+
     }
 
 
