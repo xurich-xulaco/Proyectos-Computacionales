@@ -2097,6 +2097,8 @@ Correo del corredor: {(reader.IsDBNull(6) ? "N/A" : reader.GetString(6))}";
                     }
 
                     // 4. Consultar todas las carreras en las que ha estado
+                    List<string> carrerasTemp = new List<string>(); // Nueva lista temporal para almacenar la información de las carreras
+
                     string queryCarreras = @"
                 SELECT ca.nom_carrera AS NombreCarrera, ca.year_carrera AS Año, cat.nombre_categoria AS Categoria, ca.edi_carrera AS Edicion, v.num_corredor AS NumCorredor
                 FROM CARRERA ca
@@ -2120,15 +2122,15 @@ Correo del corredor: {(reader.IsDBNull(6) ? "N/A" : reader.GetString(6))}";
                                 string edicionCarrera = reader["Edicion"].ToString();
                                 string numCorredor = reader["NumCorredor"].ToString();
 
-                                // Agregar la información de la carrera a la lista
-                                carreras.Add($@"Nombre de la carrera: {nombreCarrera}
+                                // Agregar la información de la carrera a la lista temporal
+                                carrerasTemp.Add($@"Nombre de la carrera: {nombreCarrera}
 Año: {añoCarrera}
 Categoría: {categoriaCarrera}
 Edición: {edicionCarrera}
 Número de corredor: {numCorredor}");
                             }
                             // Verifica si se encontraron carreras
-                            if (carreras.Count == 0)
+                            if (carrerasTemp.Count == 0)
                             {
                                 _logger.LogWarning("No se encontraron carreras para el corredor.");
                             }
@@ -2136,9 +2138,10 @@ Número de corredor: {numCorredor}");
                     }
 
                     // 5. Consultar los datos y tiempos de corredor de cada carrera
+                    // Luego, en la sección donde consultas los tiempos, puedes usar la lista temporal
                     List<string> resultadosCarreras = new List<string>(); // Nueva lista para almacenar los resultados de tiempos
 
-                    foreach (var carrera in carreras)
+                    foreach (var carrera in carrerasTemp)
                     {
                         // Extraer los valores necesarios de la cadena 'carrera'
                         string[] partes = carrera.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -2219,10 +2222,8 @@ Tiempo Total: {tiempoTotal}");
                         }
                     }
 
-                    carreras.AddRange(resultadosCarreras);
-
                     // Generar el contenido del archivo
-                    string contenidoReporte = corredorInfo + "\n\n" + string.Join("\n\n", carreras);
+                    string contenidoReporte = corredorInfo + "\n\n" + string.Join("\n\n", resultadosCarreras);
                     if (string.IsNullOrWhiteSpace(contenidoReporte))
                     {
                         _logger.LogWarning("El contenido del reporte está vacío.");
