@@ -2243,6 +2243,136 @@ Tiempo Total: {tiempoTotal}");
             }
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Reporte_Carrera()
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var carreras = new List<SelectListItem>();
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    string query = @"
+                SELECT 
+                    ca.ID_carrera,
+                    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')') AS Carrera
+                FROM CARRERA ca
+                ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            carreras.Add(new SelectListItem
+                            {
+                                Value = reader["ID_carrera"].ToString(),
+                                Text = reader["Carrera"].ToString()
+                            });
+                        }
+                    }
+                }
+
+                ViewBag.Carreras = carreras;
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cargar carreras: {ex.Message}");
+                return View("Error");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ObtenerCategoriasPorCarrera_Reporte(int carreraId)
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var categorias = new List<string>();
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    string query = @"
+                SELECT cat.nombre_categoria
+                FROM CATEGORIA cat
+                JOIN CARR_CAT cc ON cat.ID_categoria = cc.ID_categoria
+                WHERE cc.ID_carrera = @carreraId";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@carreraId", carreraId);
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                categorias.Add(reader["nombre_categoria"].ToString());
+                            }
+                        }
+                    }
+                }
+
+                return Json(categorias);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cargar categorías: {ex.Message}");
+                return Json(new { error = "Ocurrió un error al cargar las categorías." });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GenerarReporteCarrera(int carreraId, string rutaArchivo)
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+                // Obtener los datos necesarios para el reporte
+                var reporteData = new List<string>();
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    string query = @"
+                SELECT 
+                    ca.nom_carrera, ca.year_carrera, ca.edi_carrera,
+                    cat.nombre_categoria
+                FROM CARRERA ca
+                JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE ca.ID_carrera = @carreraId";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@carreraId", carreraId);
+
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                string line = $"{reader["nom_carrera"]}, {reader["year_carrera"]}, {reader["edi_carrera"]}, {reader["nombre_categoria"]}";
+                                reporteData.Add(line);
+                            }
+                        }
+                    }
+                }
+
+                // Generar el archivo de reporte
+                await System.IO.File.WriteAllLinesAsync(rutaArchivo, reporteData);
+
+                return Json(new { success = true, message = "Reporte generado correctamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al generar el reporte: {ex.Message}");
+                return Json(new { success = false, message = "Error al generar el reporte." });
+            }
+        }
+
     }
 
 
