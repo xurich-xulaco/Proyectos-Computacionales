@@ -2256,10 +2256,14 @@ Tiempo Total: {tiempoTotal}");
                     await connection.OpenAsync();
                     string query = @"
                 SELECT 
-                    ca.ID_carrera,
-                    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')') AS Carrera
-                FROM CARRERA ca
-                ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+    ca.ID_carrera,
+    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
+           '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+FROM CARRERA ca
+JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     using (SqlDataReader reader = await command.ExecuteReaderAsync())
