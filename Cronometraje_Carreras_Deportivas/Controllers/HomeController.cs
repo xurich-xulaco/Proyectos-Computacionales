@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
 using System.Globalization;
+using System.Data;
+using Microsoft.IdentityModel.Tokens;
 
 
 #nullable enable
@@ -2005,7 +2007,7 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
         {
             try
             {
-                // Verificar y preparar la ruta del archivo
+                // 1. Verificación de la Ruta del Archivo
                 var directorio = Path.GetDirectoryName(rutaArchivo);
                 var archivo = Path.GetFileName(rutaArchivo);
 
@@ -2028,24 +2030,55 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                 // Conexión a la base de datos
                 string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                byte[] idCorredor = null; // Variable para almacenar el ID del corredor
+                string corredorInfo = string.Empty;
                 List<string> carreras = new List<string>();
-                string corredorInfo;
 
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // Consultar los datos básicos del corredor
+                    // 2. Consulta del ID_Corredor
+                    string queryIDCorredor = @"
+    SELECT c.ID_corredor
+    FROM CORREDOR c
+    JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+    JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+    JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+    WHERE 
+        ca.year_carrera = @Year
+        AND ca.edi_carrera = @Edicion
+        AND cc.ID_categoria = (SELECT ID_categoria FROM CATEGORIA WHERE nombre_categoria = @Categoria)
+        AND vp.num_corredor = @Numero;";
+
+                    using (SqlCommand command = new SqlCommand(queryIDCorredor, connection))
+                    {
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edicion", edicion);
+                        command.Parameters.AddWithValue("@Categoria", categoria);
+                        command.Parameters.AddWithValue("@Numero", numero);
+
+                        var result = await command.ExecuteScalarAsync();
+                        if (result != null && result is byte[])
+                        {
+                            idCorredor = (byte[])result; // Mantener como byte[]
+                        }
+                    }
+
+                    if (idCorredor.IsNullOrEmpty())
+                    {
+                        return Json(new { success = false, message = "No se encontró el ID del corredor." });
+                    }
+
+                    // 3. Consulta de Información del Corredor
                     string queryCorredor = @"
-                SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, c.sex_corredor, 
-                       c.pais, c.c_corredor
+                SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, c.sex_corredor, c.pais, c.c_corredor
                 FROM CORREDOR c
-                JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
-                WHERE vp.num_corredor = @Numero";
+                WHERE c.ID_corredor = @IDCorredor;";
 
                     using (SqlCommand command = new SqlCommand(queryCorredor, connection))
                     {
-                        command.Parameters.AddWithValue("@Numero", numero);
+                        command.Parameters.Add("@IDCorredor", SqlDbType.VarBinary).Value = idCorredor;
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
@@ -2058,94 +2091,149 @@ Correo del corredor: {(reader.IsDBNull(6) ? "N/A" : reader.GetString(6))}";
                             }
                             else
                             {
-                                return Json(new { success = false, message = "No se encontró información del corredor." });
+                                _logger.LogWarning("No se encontró información del corredor.");
                             }
                         }
                     }
 
-                    // Consultar todas las carreras del corredor
+                    // 4. Consultar todas las carreras en las que ha estado
                     string queryCarreras = @"
-                WITH TiemposCorredor AS (
-                    SELECT 
-                        folio_chip,
-                        tiempo_registrado,
-                        ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-                    FROM dbo.TIEMPO
-                ),
-                Posiciones AS (
-                    SELECT 
-                        RANK() OVER (ORDER BY 
-                            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
-                        ) AS Posicion,
-                        ca.nom_carrera AS NombreCarrera,
-                        ca.year_carrera AS Año,
-                        ca.edi_carrera AS Edicion,
-                        cat.nombre_categoria AS Categoria,
-                        v.num_corredor AS NumCorredor,
-                        COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
-                        COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
-                        COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-                        CONVERT(TIME, DATEADD(SECOND, 
-                            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
-                            0
-                        )) AS TiempoTotal
-                    FROM CARRERA ca
-                    JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
-                    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-                    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-                    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
-                    WHERE v.num_corredor = @Numero
-                )
-                SELECT Posicion, NombreCarrera, Año, Edicion, Categoria, T1, T2, T3, TiempoTotal
-                FROM Posiciones;";
+                SELECT ca.nom_carrera AS NombreCarrera, ca.year_carrera AS Año, cat.nombre_categoria AS Categoria, ca.edi_carrera AS Edicion, v.num_corredor AS NumCorredor
+                FROM CARRERA ca
+                JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
+                WHERE v.ID_corredor = @IDCorredor;";
 
                     using (SqlCommand command = new SqlCommand(queryCarreras, connection))
                     {
-                        command.Parameters.AddWithValue("@Numero", numero);
+                        command.Parameters.Add("@IDCorredor", SqlDbType.VarBinary).Value = idCorredor;
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
                                 // Obtener los datos de cada carrera
-                                string posicion = reader["Posicion"].ToString();
                                 string nombreCarrera = reader["NombreCarrera"].ToString();
                                 string añoCarrera = reader["Año"].ToString();
-                                string edicionCarrera = reader["Edicion"].ToString();
                                 string categoriaCarrera = reader["Categoria"].ToString();
-                                string tiempo1 = reader["T1"].ToString();
-                                string tiempo2 = reader["T2"].ToString();
-                                string tiempo3 = reader["T3"].ToString();
-                                string tiempoTotal = reader["TiempoTotal"].ToString();
+                                string edicionCarrera = reader["Edicion"].ToString();
+                                string numCorredor = reader["NumCorredor"].ToString();
 
                                 // Agregar la información de la carrera a la lista
-                                carreras.Add($@"Posición: {posicion}
-Nombre de la carrera: {nombreCarrera}
+                                carreras.Add($@"Nombre de la carrera: {nombreCarrera}
+Año: {añoCarrera}
+Categoría: {categoriaCarrera}
+Edición: {edicionCarrera}
+Número de corredor: {numCorredor}");
+                            }
+                            // Verifica si se encontraron carreras
+                            if (carreras.Count == 0)
+                            {
+                                _logger.LogWarning("No se encontraron carreras para el corredor.");
+                            }
+                        }
+                    }
+
+                    // 5. Consultar los datos y tiempos de corredor de cada carrera
+                    List<string> resultadosCarreras = new List<string>(); // Nueva lista para almacenar los resultados de tiempos
+
+                    foreach (var carrera in carreras)
+                    {
+                        // Extraer los valores necesarios de la cadena 'carrera'
+                        string[] partes = carrera.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        string nombreCarrera = partes[0].Split(':')[1].Trim();
+                        string añoCarrera = partes[1].Split(':')[1].Trim();
+                        string categoriaCarrera = partes[2].Split(':')[1].Trim();
+                        string edicionCarrera = partes[3].Split(':')[1].Trim();
+                        string numCorredor = partes[4].Split(':')[1].Trim();
+
+                        // Consulta para obtener los tiempos y posición del corredor en la carrera
+                        string queryTiempos = @"
+        WITH TiemposCorredor AS (
+            SELECT 
+                folio_chip,
+                tiempo_registrado,
+                ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+            FROM dbo.TIEMPO
+        )
+        SELECT 
+            RANK() OVER (ORDER BY 
+                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+            ) AS Posicion,
+            COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+            COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+            COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+            CONVERT(TIME, DATEADD(SECOND, 
+                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+                0
+            )) AS TiempoTotal
+        FROM CARRERA ca
+        JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+        JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
+        LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+        LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+        LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+        WHERE 
+            ca.nom_carrera = @NombreCarrera
+            AND ca.year_carrera = @Año
+            AND ca.edi_carrera = @Edicion
+            AND cc.ID_categoria = (SELECT ID_categoria FROM CATEGORIA WHERE nombre_categoria = @Categoria)
+            AND v.num_corredor = @NumCorredor;";
+                        using (SqlCommand command = new SqlCommand(queryTiempos, connection))
+                        {
+                            command.Parameters.AddWithValue("@NombreCarrera", nombreCarrera);
+                            command.Parameters.AddWithValue("@Año", añoCarrera);
+                            command.Parameters.AddWithValue("@Edicion", edicionCarrera);
+                            command.Parameters.AddWithValue("@Categoria", categoriaCarrera);
+                            command.Parameters.AddWithValue("@NumCorredor", numCorredor);
+
+                            using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                            {
+                                if (await reader.ReadAsync())
+                                {
+                                    // Obtener los datos de la posición y tiempos
+                                    string posicion = reader["Posicion"].ToString();
+                                    string tiempo1 = reader["T1"].ToString();
+                                    string tiempo2 = reader["T2"].ToString();
+                                    string tiempo3 = reader["T3"].ToString();
+                                    string tiempoTotal = reader["TiempoTotal"].ToString();
+
+                                    // Agregar la información de la carrera y los tiempos al reporte
+                                    resultadosCarreras.Add($@"Carrera: {nombreCarrera}
 Año: {añoCarrera}
 Edición: {edicionCarrera}
 Categoría: {categoriaCarrera}
+Número de corredor: {numCorredor}
+Posición: {posicion}
 Tiempo 1: {tiempo1}
 Tiempo 2: {tiempo2}
 Tiempo 3: {tiempo3}
 Tiempo Total: {tiempoTotal}");
+                                }
                             }
                         }
                     }
+
+                    carreras.AddRange(resultadosCarreras);
+
+                    // Generar el contenido del archivo
+                    string contenidoReporte = corredorInfo + "\n\n" + string.Join("\n\n", carreras);
+                    if (string.IsNullOrWhiteSpace(contenidoReporte))
+                    {
+                        _logger.LogWarning("El contenido del reporte está vacío.");
+                    }
+
+                    // Crear el archivo
+                    await System.IO.File.WriteAllTextAsync(rutaArchivo, contenidoReporte);
+                    _logger.LogInformation("El reporte se ha escrito en el archivo: " + rutaArchivo);
+
+                    return Json(new { success = true, message = "El reporte se generó exitosamente en la ruta especificada." });
                 }
-
-                // Generar el contenido del archivo
-                string contenidoReporte = corredorInfo + "\n\n" + string.Join("\n\n", carreras);
-
-                // Crear el archivo
-                await System.IO.File.WriteAllTextAsync(rutaArchivo, contenidoReporte);
-
-                return Json(new { success = true, message = "El reporte se generó exitosamente en la ruta especificada." });
             }
             catch (Exception ex)
             {
