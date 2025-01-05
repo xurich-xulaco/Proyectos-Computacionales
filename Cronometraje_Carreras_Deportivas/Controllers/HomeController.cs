@@ -2331,37 +2331,103 @@ Tiempo Total: {tiempoTotal}");
             try
             {
                 string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-                // Obtener los datos necesarios para el reporte
                 var reporteData = new List<string>();
+
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
-                    string query = @"
-                SELECT 
-                    ca.nom_carrera, ca.year_carrera, ca.edi_carrera,
-                    cat.nombre_categoria
-                FROM CARRERA ca
-                JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera
+
+                    // 1. Obtener las categorías asociadas a la carrera
+                    var categorias = new List<string>();
+                    string categoriasQuery = @"
+                SELECT cat.nombre_categoria
+                FROM CARR_Cat cc
                 JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                WHERE ca.ID_carrera = @carreraId";
+                WHERE cc.ID_carrera = @carreraId";
 
-                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlCommand categoriasCmd = new SqlCommand(categoriasQuery, connection))
                     {
-                        command.Parameters.AddWithValue("@carreraId", carreraId);
-
-                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        categoriasCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                        using (SqlDataReader reader = await categoriasCmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                string line = $"{reader["nom_carrera"]}, {reader["year_carrera"]}, {reader["edi_carrera"]}, {reader["nombre_categoria"]}";
-                                reporteData.Add(line);
+                                categorias.Add(reader["nombre_categoria"].ToString());
                             }
                         }
                     }
+
+                    // 2. Iterar sobre cada categoría para construir el reporte
+                    foreach (var categoria in categorias)
+                    {
+                        reporteData.Add($"Categoría: {categoria}");
+                        reporteData.Add(new string('-', 50));
+
+                        string corredoresQuery = @"
+                    WITH TiemposCorredor AS (
+                        SELECT 
+                            folio_chip,
+                            tiempo_registrado,
+                            ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+                        FROM dbo.Tiempo
+                    ),
+                    Posiciones AS (
+                        SELECT 
+                            RANK() OVER (ORDER BY 
+                                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+                            ) AS Posicion,
+                            v.num_corredor AS NumCorredor, 
+                            c.nom_corredor AS Nombre,
+                            c.apP_corredor AS ApellidoPaterno,
+                            c.apM_corredor AS ApellidoMaterno,
+                            COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+                            COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+                            COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+                            CONVERT(TIME, DATEADD(SECOND, 
+                                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+                                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+                                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+                                0
+                            )) AS TiempoTotal
+                        FROM CARRERA ca
+                        JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+                        JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
+                        LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+                        LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+                        LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+                        WHERE ca.ID_carrera = @carreraId
+                          AND cat.nombre_categoria = @categoria
+                    )
+                    SELECT Posicion, NumCorredor, Nombre, ApellidoPaterno, ApellidoMaterno, T1, T2, T3, TiempoTotal
+                    FROM Posiciones
+                    ORDER BY Posicion";
+
+                        using (SqlCommand corredoresCmd = new SqlCommand(corredoresQuery, connection))
+                        {
+                            corredoresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                            corredoresCmd.Parameters.AddWithValue("@categoria", categoria);
+
+                            using (SqlDataReader reader = await corredoresCmd.ExecuteReaderAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                {
+                                    string line = $"Posición: {reader["Posicion"]}, Número: {reader["NumCorredor"]}, " +
+                                                  $"Nombre: {reader["Nombre"]} {reader["ApellidoPaterno"]} {reader["ApellidoMaterno"]}, " +
+                                                  $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
+                                    reporteData.Add(line);
+                                }
+                            }
+                        }
+
+                        reporteData.Add("\n");
+                    }
                 }
 
-                // Generar el archivo de reporte
+                // 3. Escribir el archivo
                 await System.IO.File.WriteAllLinesAsync(rutaArchivo, reporteData);
 
                 return Json(new { success = true, message = "Reporte generado correctamente." });
