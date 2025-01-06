@@ -2341,7 +2341,7 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                 {
                     await connection.OpenAsync();
 
-                    // 1. Obtener las categorías asociadas a la carrera
+                    // 1. Obtener los datos de la carrera (nombre, año y edición)
                     var categorias = new List<string>();
                     string categoriasQuery = @"
                 SELECT cat.nombre_categoria
@@ -2361,54 +2361,92 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         }
                     }
 
-                    // 2. Iterar sobre cada categoría para construir el reporte
+                    // 3. Iterar sobre cada categoría para construir el reporte
                     foreach (var categoria in categorias)
                     {
                         reporteData.Add($"Categoría: {categoria}");
                         reporteData.Add(new string('-', 50));
 
+                        // Verificar si hay participantes en la categoría
+                        string verificarParticipantesQuery = @"
+    SELECT COUNT(*) AS Participantes
+    FROM CARR_Cat cc
+    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+    WHERE cc.ID_carrera = @carreraId
+      AND cat.nombre_categoria = @categoria";
+
+                        int participantes = 0;
+
+                        using (SqlCommand verificarCmd = new SqlCommand(verificarParticipantesQuery, connection))
+                        {
+                            verificarCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                            verificarCmd.Parameters.AddWithValue("@categoria", categoria);
+
+                            participantes = (int)await verificarCmd.ExecuteScalarAsync();
+                        }
+
+                        if (participantes == 0)
+                        {
+                            // No hay participantes en esta categoría, dejar espacio en blanco y continuar
+                            reporteData.Add("\n");
+                            continue;
+                        }
+
+                        // Consultar y agregar los tres primeros corredores si hay participantes
                         string corredoresQuery = @"
-                    WITH TiemposCorredor AS (
-                        SELECT 
-                            folio_chip,
-                            tiempo_registrado,
-                            ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-                        FROM dbo.Tiempo
-                    ),
-                    Posiciones AS (
-                        SELECT 
-                            RANK() OVER (ORDER BY 
-                                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
-                            ) AS Posicion,
-                            v.num_corredor AS NumCorredor, 
-                            c.nom_corredor AS Nombre,
-                            c.apP_corredor AS ApellidoPaterno,
-                            c.apM_corredor AS ApellidoMaterno,
-                            COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
-                            COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
-                            COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-                            CONVERT(TIME, DATEADD(SECOND, 
-                                DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                                DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                                DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
-                                0
-                            )) AS TiempoTotal
-                        FROM CARRERA ca
-                        JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                        JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
-                        JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
-                        LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-                        LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-                        LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
-                        WHERE ca.ID_carrera = @carreraId
-                          AND cat.nombre_categoria = @categoria
-                    )
-                    SELECT Posicion, NumCorredor, Nombre, ApellidoPaterno, ApellidoMaterno, T1, T2, T3, TiempoTotal
-                    FROM Posiciones
-                    ORDER BY Posicion";
+WITH TiemposCorredor AS (
+    SELECT 
+        folio_chip,
+        tiempo_registrado,
+        ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+    FROM dbo.Tiempo
+),
+Posiciones AS (
+    SELECT 
+        RANK() OVER (ORDER BY 
+            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+        ) AS Posicion,
+        v.num_corredor AS NumCorredor, 
+        c.nom_corredor AS Nombre,
+        c.apP_corredor AS ApellidoPaterno,
+        c.apM_corredor AS ApellidoMaterno,
+        COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+        COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+        COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+        CONVERT(TIME, DATEADD(SECOND, 
+            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+            0
+        )) AS TiempoTotal
+    FROM CARRERA ca
+    JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+    JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
+    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    WHERE ca.ID_carrera = @carreraId
+      AND cat.nombre_categoria = @categoria
+)
+SELECT TOP 3 
+    Posicion, 
+    NumCorredor, 
+    Nombre, 
+    ApellidoPaterno, 
+    ApellidoMaterno, 
+    T1, 
+    T2, 
+    T3, 
+    TiempoTotal
+FROM Posiciones
+ORDER BY Posicion;";
+
+                        string menorTiempo = "00:00:00";
 
                         using (SqlCommand corredoresCmd = new SqlCommand(corredoresQuery, connection))
                         {
@@ -2417,21 +2455,92 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                             using (SqlDataReader reader = await corredoresCmd.ExecuteReaderAsync())
                             {
+                                int contCorredor = 0;
+                                reporteData.Add("Podio:");
                                 while (await reader.ReadAsync())
                                 {
                                     string line = $"Posición: {reader["Posicion"]}, Número: {reader["NumCorredor"]}, " +
                                                   $"Nombre: {reader["Nombre"]} {reader["ApellidoPaterno"]} {reader["ApellidoMaterno"]}, " +
                                                   $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
                                     reporteData.Add(line);
+
+                                    if (contCorredor == 0)
+                                    {
+                                        menorTiempo = $"\nMenor tiempo: {reader["TiempoTotal"]}";
+                                    }
+                                    contCorredor++;
                                 }
                             }
                         }
 
+                        reporteData.Add(menorTiempo);
+
+                        // Calcular el tiempo promedio de todos los corredores en la categoría
+                        string promedioTiemposQuery = @"
+    WITH TiemposCorredor AS (
+        SELECT 
+            folio_chip,
+            tiempo_registrado,
+            ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+        FROM dbo.Tiempo
+    ),
+    TotalTiempos AS (
+        SELECT 
+            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        FROM CARR_Cat cc
+        JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+        LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+        LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+        LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+        WHERE cc.ID_carrera = @carreraId
+          AND cc.ID_categoria = (SELECT ID_categoria FROM CATEGORIA WHERE nombre_categoria = @categoria)
+    )
+    SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedio
+    FROM TotalTiempos;";
+
+                        string tiempoPromedio = "00:00:00";
+
+                        using (SqlCommand promedioCmd = new SqlCommand(promedioTiemposQuery, connection))
+                        {
+                            promedioCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                            promedioCmd.Parameters.AddWithValue("@categoria", categoria);
+
+                            tiempoPromedio = (await promedioCmd.ExecuteScalarAsync()).ToString();
+                        }
+
+                        reporteData.Add($"\nTiempo promedio: {tiempoPromedio}");
+
+                        // Consultar número de hombres en la categoría
+                        string hombresQuery = @"
+    SELECT COUNT(*) AS TotalHombres
+    FROM CARR_Cat cc
+    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+    JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+    WHERE cc.ID_carrera = @carreraId
+      AND cc.ID_categoria = (SELECT ID_categoria FROM CATEGORIA WHERE nombre_categoria = @categoria)
+      AND c.sex_corredor = 'M';";
+
+                        int hombres = 0;
+
+                        using (SqlCommand hombresCmd = new SqlCommand(hombresQuery, connection))
+                        {
+                            hombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                            hombresCmd.Parameters.AddWithValue("@categoria", categoria);
+
+                            hombres = (int)await hombresCmd.ExecuteScalarAsync();
+                        }
+
+                        int mujeres = participantes - hombres;
+
+                        reporteData.Add($"\nNúmero de hombres: {hombres}");
+                        reporteData.Add($"Número de mujeres: {mujeres}");
                         reporteData.Add("\n");
                     }
                 }
 
-                // 3. Escribir el archivo
+                // 4. Escribir el archivo
                 await System.IO.File.WriteAllLinesAsync(rutaArchivo, reporteData);
 
                 return Json(new { success = true, message = "Reporte generado correctamente." });
