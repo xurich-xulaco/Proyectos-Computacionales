@@ -2342,6 +2342,38 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                     await connection.OpenAsync();
 
                     // 1. Obtener los datos de la carrera (nombre, año y edición)
+                    string carreraInfoQuery = @"
+            SELECT 
+                nom_carrera AS NombreCarrera, 
+                year_carrera AS Año, 
+                edi_carrera AS Edición
+            FROM 
+                CARRERA
+            WHERE 
+                ID_carrera = @ID_carrera";
+
+                    using (SqlCommand carreraInfoCmd = new SqlCommand(carreraInfoQuery, connection))
+                    {
+                        carreraInfoCmd.Parameters.AddWithValue("@ID_carrera", carreraId);
+
+                        using (SqlDataReader reader = await carreraInfoCmd.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                string carreraNombre = reader["NombreCarrera"].ToString();
+                                string carreraAño = reader["Año"].ToString();
+                                string carreraEdición = reader["Edición"].ToString();
+
+                                // Agregar la información de la carrera al reporte
+                                reporteData.Add($"Carrera: {carreraNombre}");
+                                reporteData.Add($"Año: {carreraAño}");
+                                reporteData.Add($"Edición: {carreraEdición}");
+                                reporteData.Add(new string('=', 50)); // Separador visual
+                            }
+                        }
+                    }
+
+                    // 2. Obtener las categorías asociadas a la carrera
                     var categorias = new List<string>();
                     string categoriasQuery = @"
                 SELECT cat.nombre_categoria
