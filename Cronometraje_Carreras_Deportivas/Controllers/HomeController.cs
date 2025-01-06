@@ -235,7 +235,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     string query = @"
-                WITH TiemposCorredor AS (
+            WITH TiemposCorredor AS (
                 SELECT 
                     folio_chip,
                     tiempo_registrado,
@@ -245,9 +245,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             Posiciones AS (
                 SELECT 
                     RANK() OVER (ORDER BY 
-                        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
+                        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00'))
                     ) AS Posicion,
                     v.num_corredor AS NumCorredor, 
                     c.nom_corredor AS Nombre,
@@ -256,12 +254,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
                     COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
                     COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-                    CONVERT(TIME, DATEADD(SECOND, 
-                        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-                        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-                        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
-                        0
-                    )) AS TiempoTotal
+                    COALESCE(T4.tiempo_registrado, '00:00:00') AS T4
                 FROM CARRERA ca
                 JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
                 JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -270,16 +263,18 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
                 LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
                 LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+                LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
                 WHERE ca.year_carrera = @YearCarrera
                   AND ca.edi_carrera = @EdiCarrera
                   AND cat.nombre_categoria = @Categoria
             )
-            SELECT Posicion, NumCorredor, Nombre, T1, T2, T3, TiempoTotal
+            SELECT Posicion, NumCorredor, Nombre, T1, T2, T3, T4
             FROM Posiciones
             WHERE @NombreCorredor IS NULL 
                OR CONCAT(Nombre, ' ', ApellidoPaterno, ' ', ApellidoMaterno) LIKE @NombreCorredor
-            ORDER BY Posicion;
-                        ";
+            ORDER BY 
+                DATEDIFF(SECOND, 0, COALESCE(T4, '00:00:00'));";
+
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@YearCarrera", yearCarrera.Value);
@@ -299,7 +294,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                             { "T1", reader.IsDBNull(3) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(3)) },
                             { "T2", reader.IsDBNull(4) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(4)) },
                             { "T3", reader.IsDBNull(5) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(5)) },
-                            { "TiempoTotal", reader.IsDBNull(6) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(6)) }
+                            { "T4", reader.IsDBNull(6) ? "N/A" : FormatearTiempo(reader.GetTimeSpan(6)) }
                         };
                                 resultados.Add(fila);
                             }
@@ -2242,6 +2237,177 @@ Tiempo Total: {tiempoTotal}");
                 return Json(new { success = false, message = "Ocurrió un error al generar el reporte." });
             }
         }
+
+
+        [HttpGet]
+        public async Task<IActionResult> Importar_tiempos()
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var carreras = new List<SelectListItem>();
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    string query = @"
+SELECT 
+    ca.ID_carrera,
+    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
+           '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+FROM CARRERA ca
+JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            carreras.Add(new SelectListItem
+                            {
+                                Value = reader["ID_carrera"].ToString(),
+                                Text = reader["Carrera"].ToString()
+                            });
+                        }
+                    }
+                }
+
+                ViewBag.Carreras = carreras;
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al cargar carreras: {ex.Message}");
+                return View("Error");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Subir_ArchivoTiempos(string rutaArchivo, int carreraId)
+        {
+            if (!string.IsNullOrEmpty(rutaArchivo) && System.IO.File.Exists(rutaArchivo))
+            {
+                try
+                {
+                    _logger.LogInformation($"Procesando archivo de tiempos en la ruta: {rutaArchivo}");
+                    int filasProcesadas = 0;
+                    int errores = 0;
+
+                    string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+                    using (var workbook = new XLWorkbook(rutaArchivo))
+                    {
+                        var worksheet = workbook.Worksheet(1);
+                        var filas = worksheet.RowsUsed();
+
+                        // Validar que hay filas en el archivo
+                        if (!filas.Any())
+                        {
+                            _logger.LogWarning("El archivo no contiene datos.");
+                            return Json(new { success = false, message = "El archivo no contiene datos." });
+                        }
+
+                        using (SqlConnection connection = new SqlConnection(connectionString))
+                        {
+                            await connection.OpenAsync();
+                            SqlTransaction transaction = connection.BeginTransaction();
+
+                            try
+                            {
+                                foreach (var fila in filas.Skip(1)) // Saltar encabezados
+                                {
+                                    try
+                                    {
+                                        if (fila.Cells().All(cell => cell.IsEmpty()))
+                                        {
+                                            _logger.LogWarning($"Fila {fila.RowNumber()} está vacía. Saltando.");
+                                            continue;
+                                        }
+
+                                        // Leer el folio del chip
+                                        var folioChip = fila.Cell(1).GetString().Trim();
+
+                                        if (string.IsNullOrEmpty(folioChip))
+                                        {
+                                            _logger.LogWarning($"Fila {fila.RowNumber()}: El folio del chip está vacío. Saltando.");
+                                            errores++;
+                                            continue;
+                                        }
+
+                                        // Leer hasta 4 tiempos de las columnas correspondientes
+                                        var tiempos = new List<TimeSpan>();
+                                        for (int i = 2; i <= 5; i++) // Columnas 2 a 5
+                                        {
+                                            var tiempoCelda = fila.Cell(i).GetString().Trim();
+
+                                            if (!string.IsNullOrEmpty(tiempoCelda) && TimeSpan.TryParse(tiempoCelda, out TimeSpan tiempo))
+                                            {
+                                                tiempos.Add(tiempo);
+                                            }
+                                        }
+
+                                        // Si faltan tiempos, agregar un tiempo final de 5 horas
+                                        while (tiempos.Count < 4)
+                                        {
+                                            tiempos.Add(TimeSpan.FromHours(5));
+                                        }
+
+                                        // Insertar todos los tiempos en una sola operación
+                                        string insertTiempoSql = @"
+                                    INSERT INTO Tiempo (folio_chip, tiempo_registrado)
+                                    VALUES (@FolioChip, @TiempoRegistrado)";
+
+                                        foreach (var tiempoRegistrado in tiempos)
+                                        {
+                                            using (SqlCommand insertTiempoCommand = new SqlCommand(insertTiempoSql, connection, transaction))
+                                            {
+                                                insertTiempoCommand.Parameters.AddWithValue("@FolioChip", folioChip);
+                                                insertTiempoCommand.Parameters.AddWithValue("@TiempoRegistrado", tiempoRegistrado);
+                                                await insertTiempoCommand.ExecuteNonQueryAsync();
+                                            }
+                                        }
+
+                                        filasProcesadas++;
+                                    }
+                                    catch (Exception filaEx)
+                                    {
+                                        _logger.LogError(filaEx, $"Error procesando fila {fila.RowNumber()}: {filaEx.Message}");
+                                        errores++;
+                                    }
+                                }
+
+                                transaction.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                transaction.Rollback();
+                                _logger.LogError(ex, "Error en la transacción de inserción. Se realizó un rollback.");
+                                throw;
+                            }
+                        }
+                    }
+
+                    var message = errores == 0
+                        ? $"{filasProcesadas} tiempos registrados exitosamente."
+                        : $"Archivo procesado con errores: {filasProcesadas} filas exitosas, {errores} errores.";
+
+                    _logger.LogInformation(message);
+                    return Json(new { success = true, message });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al procesar el archivo: {ex.Message}");
+                    return Json(new { success = false, message = $"Error al procesar el archivo: {ex.Message}" });
+                }
+            }
+
+            _logger.LogError("La ruta del archivo no es válida o no existe.");
+            return Json(new { success = false, message = "La ruta del archivo no es válida." });
+        }
+
 
     }
 
