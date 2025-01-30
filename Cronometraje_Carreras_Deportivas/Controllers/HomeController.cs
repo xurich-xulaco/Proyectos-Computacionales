@@ -2227,7 +2227,27 @@ Tiempo Total: {tiempoTotal}");
                     }
 
                     // Crear el archivo
-                    await System.IO.File.WriteAllTextAsync(rutaArchivo, contenidoReporte);
+                    Document document = new Document();
+                    Section section = document.AddSection();
+
+                    // Título del documento
+                    Paragraph title = section.AddParagraph("Reporte del Corredor");
+                    title.Format.Font.Size = 16;
+                    title.Format.Font.Bold = true;
+                    title.Format.Alignment = ParagraphAlignment.Center;
+                    section.AddParagraph("\n");
+
+                    // Contenido del reporte
+                    section.AddParagraph(contenidoReporte);
+
+                    // Guardar el PDF de forma asíncrona
+                    PdfDocumentRenderer renderer = new PdfDocumentRenderer(true);
+                    renderer.Document = document;
+
+                    await Task.Run(() => renderer.RenderDocument());
+
+                    await Task.Run(() => renderer.PdfDocument.Save(rutaArchivo));
+
                     _logger.LogInformation("El reporte se ha escrito en el archivo: " + rutaArchivo);
 
                     return Json(new { success = true, message = "El reporte se generó exitosamente en la ruta especificada." });
