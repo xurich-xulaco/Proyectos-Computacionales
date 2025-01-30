@@ -15,6 +15,8 @@ using ClosedXML.Excel;
 using System.Globalization;
 using System.Data;
 using Microsoft.IdentityModel.Tokens;
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.Rendering;
 
 
 #nullable enable
@@ -123,7 +125,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del super administrador (sin hashing)
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -175,7 +177,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del superadministrador
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 10";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -2225,7 +2227,27 @@ Tiempo Total: {tiempoTotal}");
                     }
 
                     // Crear el archivo
-                    await System.IO.File.WriteAllTextAsync(rutaArchivo, contenidoReporte);
+                    Document document = new Document();
+                    Section section = document.AddSection();
+
+                    // Título del documento
+                    Paragraph title = section.AddParagraph("Reporte del Corredor");
+                    title.Format.Font.Size = 16;
+                    title.Format.Font.Bold = true;
+                    title.Format.Alignment = ParagraphAlignment.Center;
+                    section.AddParagraph("\n");
+
+                    // Contenido del reporte
+                    section.AddParagraph(contenidoReporte);
+
+                    // Guardar el PDF de forma asíncrona
+                    PdfDocumentRenderer renderer = new PdfDocumentRenderer(true);
+                    renderer.Document = document;
+
+                    await Task.Run(() => renderer.RenderDocument());
+
+                    await Task.Run(() => renderer.PdfDocument.Save(rutaArchivo));
+
                     _logger.LogInformation("El reporte se ha escrito en el archivo: " + rutaArchivo);
 
                     return Json(new { success = true, message = "El reporte se generó exitosamente en la ruta especificada." });
@@ -2737,10 +2759,31 @@ ORDER BY Posicion;";
                     }
                 }
 
-                // 4. Escribir el archivo
-                await System.IO.File.WriteAllLinesAsync(rutaArchivo, reporteData);
+                // 4. Escribir el archivo PDF con PdfSharp + MigraDoc
+                Document doc = new Document();
+                Section section = doc.AddSection();
 
-                return Json(new { success = true, message = "Reporte generado correctamente." });
+                // Título principal
+                Paragraph title = section.AddParagraph("Reporte de Carrera");
+                title.Format.Font.Size = 16;
+                title.Format.Font.Bold = true;
+                title.Format.Alignment = ParagraphAlignment.Center;
+                section.AddParagraph("\n");
+
+                // Contenido del reporte
+                foreach (var line in reporteData)
+                {
+                    Paragraph p = section.AddParagraph(line);
+                    p.Format.Font.Size = 12;
+                }
+
+                // Guardar el PDF
+                PdfDocumentRenderer renderer = new PdfDocumentRenderer(true);
+                renderer.Document = doc;
+                renderer.RenderDocument();
+                await Task.Run(() => renderer.PdfDocument.Save(rutaArchivo));
+
+                return Json(new { success = true, message = "Reporte PDF generado correctamente." });
             }
             catch (Exception ex)
             {
