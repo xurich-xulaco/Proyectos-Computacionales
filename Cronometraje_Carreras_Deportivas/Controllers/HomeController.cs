@@ -15,8 +15,8 @@ using ClosedXML.Excel;
 using System.Globalization;
 using System.Data;
 using Microsoft.IdentityModel.Tokens;
-using MigraDoc.DocumentObjectModel;
-using MigraDoc.Rendering;
+using iTextSharp.text;
+using iTextSharp.text.pdf;
 
 
 #nullable enable
@@ -2226,27 +2226,40 @@ Tiempo Total: {tiempoTotal}");
                         _logger.LogWarning("El contenido del reporte está vacío.");
                     }
 
-                    // Crear el archivo
-                    Document document = new Document();
-                    Section section = document.AddSection();
+                    // ===============================
+                    // Generación del PDF usando iTextSharp (Tamaño Carta)
+                    // ===============================
+                    // Se utiliza FileStream para crear el archivo PDF
+                    using (FileStream stream = new FileStream(rutaArchivo, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        // Crear el documento en tamaño carta (Letter) con márgenes de 50 unidades
+                        Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
+                        PdfWriter writer = PdfWriter.GetInstance(pdfDoc, stream);
+                        pdfDoc.Open();
 
-                    // Título del documento
-                    Paragraph title = section.AddParagraph("Reporte del Corredor");
-                    title.Format.Font.Size = 16;
-                    title.Format.Font.Bold = true;
-                    title.Format.Alignment = ParagraphAlignment.Center;
-                    section.AddParagraph("\n");
+                        // Definir las fuentes a usar
+                        Font titleFont = FontFactory.GetFont("Arial", 16, Font.BOLD);
+                        Font bodyFont = FontFactory.GetFont("Arial", 12, Font.NORMAL);
 
-                    // Contenido del reporte
-                    section.AddParagraph(contenidoReporte);
+                        // Título del documento
+                        Paragraph titleParagraph = new Paragraph("Reporte del Corredor", titleFont)
+                        {
+                            Alignment = Element.ALIGN_CENTER
+                        };
+                        pdfDoc.Add(titleParagraph);
 
-                    // Guardar el PDF de forma asíncrona
-                    PdfDocumentRenderer renderer = new PdfDocumentRenderer(true);
-                    renderer.Document = document;
+                        // Espacio adicional
+                        pdfDoc.Add(new Paragraph("\n", bodyFont));
 
-                    await Task.Run(() => renderer.RenderDocument());
+                        // Contenido del reporte
+                        Paragraph contentParagraph = new Paragraph(contenidoReporte, bodyFont);
+                        pdfDoc.Add(contentParagraph);
 
-                    await Task.Run(() => renderer.PdfDocument.Save(rutaArchivo));
+                        // Cerrar el documento
+                        pdfDoc.Close();
+                    }
+                    // ===============================
+                    // Fin de generación del PDF con iTextSharp
 
                     _logger.LogInformation("El reporte se ha escrito en el archivo: " + rutaArchivo);
 
@@ -2759,29 +2772,46 @@ ORDER BY Posicion;";
                     }
                 }
 
-                // 4. Escribir el archivo PDF con PdfSharp + MigraDoc
-                Document doc = new Document();
-                Section section = doc.AddSection();
-
-                // Título principal
-                Paragraph title = section.AddParagraph("Reporte de Carrera");
-                title.Format.Font.Size = 16;
-                title.Format.Font.Bold = true;
-                title.Format.Alignment = ParagraphAlignment.Center;
-                section.AddParagraph("\n");
-
-                // Contenido del reporte
-                foreach (var line in reporteData)
+                // ===============================
+                // Generación del PDF usando iTextSharp (Tamaño Carta)
+                // ===============================
+                // Se utiliza FileStream para crear y escribir el archivo PDF
+                using (FileStream stream = new FileStream(rutaArchivo, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    Paragraph p = section.AddParagraph(line);
-                    p.Format.Font.Size = 12;
-                }
+                    // Crear el documento en tamaño carta (Letter) con márgenes de 50 unidades
+                    Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
+                    PdfWriter writer = PdfWriter.GetInstance(pdfDoc, stream);
+                    pdfDoc.Open();
 
-                // Guardar el PDF
-                PdfDocumentRenderer renderer = new PdfDocumentRenderer(true);
-                renderer.Document = doc;
-                renderer.RenderDocument();
-                await Task.Run(() => renderer.PdfDocument.Save(rutaArchivo));
+                    // Definir las fuentes a usar
+                    Font titleFont = FontFactory.GetFont("Arial", 16, Font.BOLD);
+                    Font bodyFont = FontFactory.GetFont("Arial", 12, Font.NORMAL);
+
+                    // Título principal
+                    Paragraph title = new Paragraph("Reporte de Carrera", titleFont)
+                    {
+                        Alignment = Element.ALIGN_CENTER
+                    };
+                    pdfDoc.Add(title);
+
+                    // Espacio adicional
+                    pdfDoc.Add(new Paragraph("\n", bodyFont));
+
+                    // Agregar cada línea del reporte
+                    foreach (var line in reporteData)
+                    {
+                        Paragraph p = new Paragraph(line, bodyFont)
+                        {
+                            SpacingAfter = 5 // Espacio entre líneas
+                        };
+                        pdfDoc.Add(p);
+                    }
+
+                    // Cerrar el documento
+                    pdfDoc.Close();
+                }
+                // ===============================
+                // Fin de la generación del PDF con iTextSharp
 
                 return Json(new { success = true, message = "Reporte PDF generado correctamente." });
             }
