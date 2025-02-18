@@ -11,8 +11,40 @@
 
         </div>
     </div>
+   
 </nav>
+<div class="row " style="background-color:#004A98;">
+    <div class="col"></div>
+    <div class="col">
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98;  color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Modificar_Corredor", "Home")'">Modificar Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_Corredores", "Home")'">Importar corredores</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_tiempos", "Home")'">Importar tiempos</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Reporte de Corredor</button></li>
+    </ul>
+    </div>
+    <div class="col">
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
+    </ul>
+    </div>
+    <div class="col"><button class="btn " style="background-color:#004A98;color: white; width:max-content;">Mostrar base de datos </button></div>
+    <div class="col"><button class="btn " style="background-color:#004A98;color: white;width:max-content;">Exportar resultados</button></div>
+    <div class="col"></div>
+</div>
+
+
 <br>
+
+<div>
 <form id="searchForm" method="post" action="@Url.Action("BuscarCorredores", "Home")">
     <!-- Formulario en una línea con distribución de dos mitades -->
     <div class="d-flex justify-content-between">
@@ -49,7 +81,7 @@
         </div>
     </div>
 </form>
-
+</div>
 @if (!string.IsNullOrEmpty(ViewBag.Error))
 {
     <div class="alert alert-danger">@ViewBag.Error</div>
@@ -58,10 +90,10 @@
 
 <div class="row">
     <!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
-    <div class="col-6 ">
+   
         <div id="resultTable" class="mt-4" style=" margin: auto;">
 
-            <table class="table table-striped">
+            <table class="table table-primary table-striped table-bordered">
                 <thead>
                     <tr>
                         <th>Posición</th>
@@ -71,13 +103,15 @@
                         <th>T2</th>
                         <th>T3</th>
                         <th>Tiempo Total</th>
+                        <th>Opciones</th>
                     </tr>
                 </thead>
                 @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
                 {
-                    <tbody>
+                    <tbody class="table-group-divider">
                         @foreach (var corredor in ViewBag.ResultadosBusqueda)
                         {
+                           
                             <tr>
                                 <td>@corredor["Posicion"]</td>
                                 <td>@corredor["NumCorredor"]</td>
@@ -86,9 +120,14 @@
                                 <td>@corredor["T2"]</td>
                                 <td>@corredor["T3"]</td>
                                 <td>@corredor["T4"]</td>
+                                <td>
+                                <button type="button" class="btn btn-danger">eliminar</button>
+                                <button type="button" class="btn btn-warning">modificar</button></td>
                             </tr>
+                            
+                            
                         }
-                    </tbody>
+                        </tbody>
                 }
                 else if (ViewBag.ResultadosBusqueda != null)
                 {
@@ -144,84 +183,7 @@
             }
         });
     </script>
-    <div class="col-5 " style="text-align: center;">
-
-        <img style="width: 30%; height:45%;" src="https://cdn-icons-png.flaticon.com/512/1986/1986941.png" alt="">
-        <br><br>
-        <div class="row">
-            <div class="col-2"></div>
-            <div class="col-4">
-                <div class="dropdown">
-                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98; width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
-                    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Modificar_Corredor", "Home")'">Modificar Corredor</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_Corredores", "Home")'">Importar corredores</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_tiempos", "Home")'">Importar tiempos</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Reporte de Corredor</button></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="col-4"><button class="btn btn-outline-light " style="background-color:#004A98 ;width:max-content;">Exportar resultados</button></div>
-        </div>
-        <br>
-        <br>
-        <div class="row">
-            <div class="col-2"></div>
-            <div class="col-4"><button class="btn btn-outline-light" style="background-color:#004A98; width:max-content;">Mostrar base de datos </button></div>
-            <div class="col-4">
-                <div class="dropdown">
-                    <button type="button" class="btn btn-outline-light dropdown-toggle" style="background-color:#004A98 ;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
-                    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
-                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
-                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
-                        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
-                        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
-
-                    </ul>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-
-    <!-- Modal para eliminar corredor -->
-    <!-- Modal para modificar corredor -->
-    <!-- Modal para Exportar Corredores -->
-    <!-- Modal para Reporte de Corredor -->
-    <!-- New Race Modal -->
-    <!-- Modal para eliminar carrera -->
-    <!-- Modal para modificar carrera -->
-    <!--Generar reporte de carrera-->
-    <div id="importarCorredoresModal" class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="menuImportarCorredores" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div id="cabeceraMenu" class="modal-header">
-                    <h5 class="modal-title" id="menuImportarCorredores">Importar Corredores</h5>
-                </div>
-                <div class="container">
-                    <form asp-controller="Home" asp-action="Upload" method="post" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label for="fileUpload">Selecciona un archivo Excel (.xlsx)</label>
-                            <input type="file" class="form-control-file" id="fileUpload" name="fileUpload" accept=".xlsx" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Subir</button>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
-                    <div class="ms-auto">
-                        <button type="submit" class="btn btn-primary">Importar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
+    
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

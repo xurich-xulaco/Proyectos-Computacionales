@@ -2,50 +2,62 @@
     ViewData["Title"] = "Importar Corredores";
 }
 
-<div class="form-wrapper">
-    <h2>Importar Corredores desde Excel</h2>
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+    </div>
 
-    <form id="importar-corredores-form" class="form-container">
-        <!-- Ruta del archivo -->
-        <div class="form-row">
-            <div class="form-group col-md-12">
-                <label for="rutaArchivo">Ruta del Archivo Excel <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="rutaArchivo" name="rutaArchivo" placeholder="Ejemplo: C:\archivos\corredores.xlsx" required />
-            </div>
+</nav>
+
+<br />
+<body>
+    <div class="form-container style=" display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.05);"">
+        <div class="form">
+
+
+            <form id="importar-corredores-form" class="container">
+                <h2>Importar Corredores desde Excel</h2>
+                <!-- Ruta del archivo -->
+                <div class="form-row">
+                    <div class="form-group col-md-12">
+                        <label for="rutaArchivo">Ruta del Archivo Excel <span class="text-danger">*</span> <span>(folio, nombre, ap paterno, ap, materno) </span></label>
+                        <input type="text" class="form-control" id="rutaArchivo" name="rutaArchivo" placeholder="Ejemplo: C:\archivos\corredores.xlsx" required />
+                    </div>
+                </div>
+
+                <!-- Selección de Carrera -->
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="CarreraId">Seleccione una Carrera <span class="text-danger">*</span></label>
+                        <select id="CarreraId" name="CarreraId" class="form-control" required>
+                            <option value="" disabled selected>Seleccione una Carrera</option>
+                            @foreach (var carrera in ViewBag.Carreras)
+                            {
+                                <option value="@carrera.Value">@carrera.Text</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Selección de Categoría -->
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="CategoriaId">Seleccione una Categoría <span class="text-danger">*</span></label>
+                        <select id="CategoriaId" name="CategoriaNombre" class="form-control" required>
+                            <option value="" disabled selected>Seleccione una Categoría</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="form-row buttons-row">
+                    <button type="button" id="cancelar-btn" class="btn btn-cancel">Cancelar</button>
+                    <button type="button" id="importar-btn" class="btn btn-create">Importar</button>
+                </div>
+            </form>
         </div>
-
-        <!-- Selección de Carrera -->
-        <div class="form-row">
-            <div class="form-group col-md-6">
-                <label for="CarreraId">Seleccione una Carrera <span class="text-danger">*</span></label>
-                <select id="CarreraId" name="CarreraId" class="form-control" required>
-                    <option value="" disabled selected>Seleccione una Carrera</option>
-                    @foreach (var carrera in ViewBag.Carreras)
-                    {
-                        <option value="@carrera.Value">@carrera.Text</option>
-                    }
-                </select>
-            </div>
-        </div>
-
-        <!-- Selección de Categoría -->
-        <div class="form-row">
-            <div class="form-group col-md-6">
-                <label for="CategoriaId">Seleccione una Categoría <span class="text-danger">*</span></label>
-                <select id="CategoriaId" name="CategoriaNombre" class="form-control" required>
-                    <option value="" disabled selected>Seleccione una Categoría</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Botones -->
-        <div class="form-row buttons-row">
-            <button type="button" id="cancelar-btn" class="btn btn-cancel">Cancelar</button>
-            <button type="button" id="importar-btn" class="btn btn-create">Importar</button>
-        </div>
-    </form>
-</div>
-
+    </div>
+</body>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -124,7 +136,6 @@
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        display: flex;
         justify-content: center;
         align-items: center;
         height: 100vh;
