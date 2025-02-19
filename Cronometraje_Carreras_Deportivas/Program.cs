@@ -10,6 +10,10 @@ builder.Services.AddDbContext<CronometrajeContext>(options =>
 // Agregar controladores con vistas
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();//agregado
+builder.Services.AddSession(); //agregado
+
+
 var app = builder.Build();
 
 // Configuración de middleware
@@ -22,7 +26,19 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+app.Use(async (context, next) => //todo esto agregado
+{
+    context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+    context.Response.Headers["Pragma"] = "no-cache";
+    context.Response.Headers["Expires"] = "-1";
+
+    await next();
+});
+
+
 app.UseRouting();
+
+app.UseSession(); //agregado
 
 app.UseAuthorization();
 

@@ -1,17 +1,19 @@
-﻿@{
+﻿@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor HttpContextAccessor
+@{
     ViewBag.Title = "Pantalla Inicial";
 }
 
-<nav class="navbar navbar-expand-sm  header">
+<nav class="navbar navbar-expand-sm header">
     <div class="container-fluid">
-        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="Logo" style="max-width: 15%;">
         <div class="rounded-pill">
-            <h4>tomas tapia</h4>
-            <button class="btn btn-outline-light"><a href="iniciar-sesion.html">Cerrar sesión </a> </button>
-
+            <h4>@HttpContextAccessor.HttpContext.Session.GetString("Usuario")</h4>
+            <form asp-controller="Home" asp-action="Logout" method="post">
+                <button id="logoutButton" class="btn btn-outline-light">Cerrar sesión</button>
+            </form>
         </div>
     </div>
-   
 </nav>
 <div class="row " style="background-color:#004A98;">
     <div class="col"></div>
@@ -340,4 +342,14 @@
 
     // Inicializar los datos cuando se cargue la página
     document.addEventListener('DOMContentLoaded', cargarCarreras);
+</script>
+
+<script>
+    //agregado
+    document.querySelector("#logoutButton").addEventListener("click", function () {
+        fetch('/Home/Logout', { method: 'POST' })
+            .then(response => {
+                window.location.replace("/Home/Index"); // Redirige sin guardar en el historial
+            });
+    });
 </script>

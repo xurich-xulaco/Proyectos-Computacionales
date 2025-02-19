@@ -27,12 +27,14 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         private readonly CronometrajeContext _context;
         private readonly ILogger<HomeController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor; //agregado
 
-        public HomeController(ILogger<HomeController> logger, IConfiguration configuration, CronometrajeContext context)
+        public HomeController(ILogger<HomeController> logger, IConfiguration configuration, CronometrajeContext context, IHttpContextAccessor httpContextAccessor)
         {
             _logger = logger;
             _configuration = configuration;
             _context = context;
+            _httpContextAccessor = httpContextAccessor; //agregado
         }
 
         public IActionResult Index()
@@ -64,7 +66,8 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         if (count > 0)
                         {
                             _logger.LogInformation($"Usuario {usuario} ha iniciado sesión");
-                            return RedirectToAction("Pantalla_ini");
+                            _httpContextAccessor.HttpContext.Session.SetString("Usuario", usuario); //Agregado
+                            return RedirectToAction("Pantalla_ini"); // Redirigir a la pantalla principal
                         }
                         else
                         {
@@ -82,6 +85,16 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return View();
             }
         }
+
+        [HttpPost]
+        public IActionResult Logout()
+        {
+            HttpContext.Session.Clear();
+            HttpContext.Response.Cookies.Delete(".AspNetCore.Session");
+
+            return RedirectToAction("Index");
+        }
+
         public IActionResult Privacy()
         {
             return View();
@@ -89,6 +102,12 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
         public async Task<IActionResult> Pantalla_ini()
         {
+            // agregado el if
+            if (string.IsNullOrEmpty(HttpContext.Session.GetString("Usuario")))
+            {
+                return RedirectToAction("Index"); // Si la sesión no existe, redirigir al login
+            }
+
             var anios = new List<int>();
             string connectionString = _configuration.GetConnectionString("DefaultConnection");
             using (SqlConnection connection = new SqlConnection(connectionString))
