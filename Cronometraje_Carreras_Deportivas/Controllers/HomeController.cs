@@ -2596,52 +2596,48 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
             try
             {
                 string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                var reporteData = new List<string>();
+                // Variables para la portada
+                string carreraNombre = "";
+                string carreraAño = "";
+                string carreraEdicion = "";
+
+                // Lista de categorías (se filtrará posteriormente)
+                var categorias = new List<string>();
 
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // 1. Obtener los datos de la carrera (nombre, año y edición)
+                    // 1. Obtener los datos básicos de la carrera
                     string carreraInfoQuery = @"
-            SELECT 
-                nom_carrera AS NombreCarrera, 
-                year_carrera AS Año, 
-                edi_carrera AS Edición
-            FROM 
-                CARRERA
-            WHERE 
-                ID_carrera = @ID_carrera";
-
+                SELECT 
+                    nom_carrera AS NombreCarrera, 
+                    year_carrera AS Año, 
+                    edi_carrera AS Edición
+                FROM 
+                    CARRERA
+                WHERE 
+                    ID_carrera = @ID_carrera";
                     using (SqlCommand carreraInfoCmd = new SqlCommand(carreraInfoQuery, connection))
                     {
                         carreraInfoCmd.Parameters.AddWithValue("@ID_carrera", carreraId);
-
                         using (SqlDataReader reader = await carreraInfoCmd.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
-                                string carreraNombre = reader["NombreCarrera"].ToString();
-                                string carreraAño = reader["Año"].ToString();
-                                string carreraEdición = reader["Edición"].ToString();
-
-                                // Agregar la información de la carrera al reporte
-                                reporteData.Add($"Carrera: {carreraNombre}");
-                                reporteData.Add($"Año: {carreraAño}");
-                                reporteData.Add($"Edición: {carreraEdición}");
-                                reporteData.Add(new string('=', 50)); // Separador visual
+                                carreraNombre = reader["NombreCarrera"].ToString();
+                                carreraAño = reader["Año"].ToString();
+                                carreraEdicion = reader["Edición"].ToString();
                             }
                         }
                     }
 
-                    // 2. Obtener las categorías asociadas a la carrera y filtrar la de menor km
-                    var categorias = new List<string>();
+                    // 2. Obtener las categorías asociadas a la carrera
                     string categoriasQuery = @"
-    SELECT DISTINCT cat.nombre_categoria
-    FROM CARR_Cat cc
-    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    WHERE cc.ID_carrera = @carreraId";
-
+                SELECT DISTINCT cat.nombre_categoria
+                FROM CARR_Cat cc
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE cc.ID_carrera = @carreraId";
                     using (SqlCommand categoriasCmd = new SqlCommand(categoriasQuery, connection))
                     {
                         categoriasCmd.Parameters.AddWithValue("@carreraId", carreraId);
@@ -2654,126 +2650,141 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         }
                     }
 
-                    // Procesar la lista de categorías para excluir la de menor kilometraje 
-                    // y seleccionar solo las dos restantes
+                    // 3. Filtrar la categoría con menor km y limitar si hay más de 2
                     if (categorias.Count > 0)
                     {
-                        // Convertir cada categoría a un objeto que contiene el nombre y el valor numérico de km
                         var categoriasKm = categorias.Select(c =>
                         {
-                            // Se espera que el string tenga el formato "N km"
+                            // Se espera el formato "N km"
                             string[] parts = c.Split(' ');
                             int km = int.TryParse(parts[0], out int valor) ? valor : 0;
                             return new { Nombre = c, Km = km };
                         }).ToList();
-
-                        // Excluir la categoría con el menor km
                         int minKm = categoriasKm.Min(x => x.Km);
                         var categoriasFiltradas = categoriasKm.Where(x => x.Km != minKm).ToList();
-
-                        // Si quedan más de dos categorías, se seleccionan las dos de mayor km
                         if (categoriasFiltradas.Count > 2)
                         {
-                            categoriasFiltradas = categoriasFiltradas
-                                .OrderByDescending(x => x.Km)
-                                .Take(2)
-                                .ToList();
+                            categoriasFiltradas = categoriasFiltradas.OrderByDescending(x => x.Km)
+                                                                       .Take(2)
+                                                                       .ToList();
                         }
-
-                        // Actualizar la lista de categorías a utilizar en el reporte
                         categorias = categoriasFiltradas.Select(x => x.Nombre).ToList();
                     }
 
-                    //Settear listas
+                    // Variable para seleccionar las opciones (booleanos) según la categoría
                     int cat_cont = 0;
 
-                    // 3. Iterar sobre cada categoría para construir el reporte
-                    foreach (var categoria in categorias)
+                    // 4. Generar el PDF con iTextSharp (estructura formal)
+                    using (var ms = new MemoryStream())
                     {
-                        bool[] orden;
+                        Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
+                        PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
+                        pdfDoc.Open();
 
-                        if(cat_cont == 0)
+                        // Definir fuentes
+                        var coverTitleFont = FontFactory.GetFont("Arial", 20, Font.BOLD);
+                        var coverInfoFont = FontFactory.GetFont("Arial", 14, Font.NORMAL);
+                        var categoryTitleFont = FontFactory.GetFont("Arial", 16, Font.BOLD);
+                        var subtitleFont = FontFactory.GetFont("Arial", 14, Font.BOLD);
+                        var bodyFont = FontFactory.GetFont("Arial", 12, Font.NORMAL);
+
+                        // --- Portada ---
+                        Paragraph coverTitle = new Paragraph("Reporte de Carrera", coverTitleFont)
                         {
-                            orden = lista1;
-                        }else if(cat_cont == 1)
+                            Alignment = Element.ALIGN_CENTER
+                        };
+                        pdfDoc.Add(coverTitle);
+                        pdfDoc.Add(new Paragraph("\n"));
+                        pdfDoc.Add(new Paragraph($"Carrera: {carreraNombre}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
+                        pdfDoc.Add(new Paragraph($"Año: {carreraAño}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
+                        pdfDoc.Add(new Paragraph($"Edición: {carreraEdicion}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
+                        pdfDoc.NewPage(); // Salto de página tras la portada
+
+                        // --- Por cada categoría, una nueva página con secciones ---
+                        foreach (var categoria in categorias)
                         {
-                            orden = lista2;
-                        }else
-                        {
-                            _logger.LogError($"Error al procesar las opciones del reporte");
-                            return Json(new { success = false, message = "Error al procesar las opciones del reporte." });
-                        }
+                            // Seleccionar el arreglo de opciones correspondiente
+                            bool[] orden;
+                            if (cat_cont == 0)
+                                orden = lista1;
+                            else if (cat_cont == 1)
+                                orden = lista2;
+                            else
+                            {
+                                _logger.LogError("Error al procesar las opciones del reporte");
+                                return Json(new { success = false, message = "Error al procesar las opciones del reporte." });
+                            }
 
-                        reporteData.Add($"\nCategoría: {categoria}");
-                        reporteData.Add(new string('-', 50));
+                            pdfDoc.NewPage();
+                            // Encabezado de la categoría
+                            pdfDoc.Add(new Paragraph($"Categoría: {categoria}", categoryTitleFont));
+                            pdfDoc.Add(new Paragraph(new string('-', 50), bodyFont));
 
-                        // Verificar si existen participantes en la categoría
-                        string verificarParticipantesQuery = @"
-    SELECT COUNT(*) AS Participantes
-    FROM CARR_Cat cc
-    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    WHERE cc.ID_carrera = @carreraId
-      AND cat.nombre_categoria = @categoria";
+                            // Verificar participantes en la categoría
+                            string verificarParticipantesQuery = @"
+                        SELECT COUNT(*) AS Participantes
+                        FROM CARR_Cat cc
+                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        WHERE cc.ID_carrera = @carreraId
+                          AND cat.nombre_categoria = @categoria";
+                            int participantes = 0;
+                            using (SqlCommand verificarCmd = new SqlCommand(verificarParticipantesQuery, connection))
+                            {
+                                verificarCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                verificarCmd.Parameters.AddWithValue("@categoria", categoria);
+                                participantes = (int)await verificarCmd.ExecuteScalarAsync();
+                            }
+                            if (participantes == 0)
+                            {
+                                pdfDoc.Add(new Paragraph("Sin participantes en esta categoría.", bodyFont));
+                                cat_cont++;
+                                continue;
+                            }
 
-                        int participantes = 0;
-                        using (SqlCommand verificarCmd = new SqlCommand(verificarParticipantesQuery, connection))
-                        {
-                            verificarCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                            verificarCmd.Parameters.AddWithValue("@categoria", categoria);
-                            participantes = (int)await verificarCmd.ExecuteScalarAsync();
-                        }
-                        if (participantes == 0)
-                        {
-                            reporteData.Add("Sin participantes en esta categoría.\n");
-                            cat_cont++;
-                            continue;
-                        }
+                            // Obtener totales de hombres y mujeres
+                            int hombres = 0, mujeres = 0;
+                            string totalHombresQuery = @"
+                        SELECT COUNT(*) 
+                        FROM CARR_Cat cc
+                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+                        JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        WHERE cc.ID_carrera = @carreraId
+                          AND cat.nombre_categoria = @categoria
+                          AND c.sex_corredor = 'M';";
+                            using (SqlCommand hombresCmd = new SqlCommand(totalHombresQuery, connection))
+                            {
+                                hombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                hombresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                hombres = (int)await hombresCmd.ExecuteScalarAsync();
+                            }
+                            string totalMujeresQuery = @"
+                        SELECT COUNT(*) 
+                        FROM CARR_Cat cc
+                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+                        JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        WHERE cc.ID_carrera = @carreraId
+                          AND cat.nombre_categoria = @categoria
+                          AND c.sex_corredor = 'F';";
+                            using (SqlCommand mujeresCmd = new SqlCommand(totalMujeresQuery, connection))
+                            {
+                                mujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                mujeresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                mujeres = (int)await mujeresCmd.ExecuteScalarAsync();
+                            }
 
-                        // Pre-verificar el número de participantes por sexo
-                        string totalHombresQuery = @"
-                    SELECT COUNT(*) 
-                    FROM CARR_Cat cc
-                    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-                    JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                    WHERE cc.ID_carrera = @carreraId
-                      AND cat.nombre_categoria = @categoria
-                      AND c.sex_corredor = 'M';";
-                        int hombres = 0;
-                        using (SqlCommand hombresCmd = new SqlCommand(totalHombresQuery, connection))
-                        {
-                            hombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                            hombresCmd.Parameters.AddWithValue("@categoria", categoria);
-                            hombres = (int)await hombresCmd.ExecuteScalarAsync();
-                        }
-                        string totalMujeresQuery = @"
-                    SELECT COUNT(*) 
-                    FROM CARR_Cat cc
-                    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-                    JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                    WHERE cc.ID_carrera = @carreraId
-                      AND cat.nombre_categoria = @categoria
-                      AND c.sex_corredor = 'F';";
-                        int mujeres = 0;
-                        using (SqlCommand mujeresCmd = new SqlCommand(totalMujeresQuery, connection))
-                        {
-                            mujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                            mujeresCmd.Parameters.AddWithValue("@categoria", categoria);
-                            mujeres = (int)await mujeresCmd.ExecuteScalarAsync();
-                        }
-
-
-                        // ================================
-                        // SEXOS MIXTOS
-                        // ================================
-
-                        // Podio mixto (Top 3)
-                        if (orden[0] == true)
-                        {
-
-                            string podioMixtoQuery = @"
+                            // --- Sección Mixta ---
+                            if (orden[0] || orden[1] || orden[2] || orden[3] || orden[4])
+                            {
+                                pdfDoc.Add(new Paragraph("Sección Mixta", subtitleFont));
+                                pdfDoc.Add(new Paragraph("\n", bodyFont));
+                                // Podio Mixto
+                                if (orden[0])
+                                {
+                                    pdfDoc.Add(new Paragraph("Podio Mixto:", bodyFont));
+                                    string podioMixtoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -2821,29 +2832,27 @@ SELECT TOP 3
     TiempoTotal
 FROM Posiciones
 ORDER BY Posicion;";
-
-                            reporteData.Add("Podio Mixto:");
-                            using (SqlCommand podioMixtoCmd = new SqlCommand(podioMixtoQuery, connection))
-                            {
-                                podioMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                podioMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
-                                using (SqlDataReader reader = await podioMixtoCmd.ExecuteReaderAsync())
-                                {
-                                    while (await reader.ReadAsync())
+                                    using (SqlCommand podioMixtoCmd = new SqlCommand(podioMixtoQuery, connection))
                                     {
-                                        string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
-                                            $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
-                                            $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
-                                        reporteData.Add(linea);
+                                        podioMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        podioMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        using (SqlDataReader reader = await podioMixtoCmd.ExecuteReaderAsync())
+                                        {
+                                            while (await reader.ReadAsync())
+                                            {
+                                                string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
+                                                                 $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
+                                                                 $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
+                                                pdfDoc.Add(new Paragraph(linea, bodyFont));
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
-
-                        // Menor tiempo mixto
-                        if (orden[1] == true)
-                        {
-                            string menorTiempoMixtoQuery = @"
+                                // Menor tiempo Mixto
+                                if (orden[1])
+                                {
+                                    pdfDoc.Add(new Paragraph("Menor tiempo (Mixto):", bodyFont));
+                                    string menorTiempoMixtoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -2867,21 +2876,19 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMixto
 FROM TotalTiempos;";
-
-                            string menorTiempoMixto = "00:00:00";
-                            using (SqlCommand menorMixtoCmd = new SqlCommand(menorTiempoMixtoQuery, connection))
-                            {
-                                menorMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                menorMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
-                                menorTiempoMixto = (await menorMixtoCmd.ExecuteScalarAsync()).ToString();
-                            }
-                            reporteData.Add($"Menor tiempo (mixto): {menorTiempoMixto}");
-                        }
-
-                        // Tiempo promedio mixto
-                        if (orden[2] == true)
-                        {
-                            string tiempoPromedioMixtoQuery = @"
+                                    using (SqlCommand menorMixtoCmd = new SqlCommand(menorTiempoMixtoQuery, connection))
+                                    {
+                                        menorMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        menorMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string menorTiempoMixto = (await menorMixtoCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Menor tiempo (Mixto): {menorTiempoMixto}", bodyFont));
+                                    }
+                                }
+                                // Tiempo promedio Mixto
+                                if (orden[2])
+                                {
+                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Mixto):", bodyFont));
+                                    string tiempoPromedioMixtoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -2905,37 +2912,34 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioMixto
 FROM TotalTiempos;";
-
-                            string tiempoPromedioMixto = "00:00:00";
-                            using (SqlCommand tiempoPromedioMixtoCmd = new SqlCommand(tiempoPromedioMixtoQuery, connection))
-                            {
-                                tiempoPromedioMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                tiempoPromedioMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
-                                tiempoPromedioMixto = (await tiempoPromedioMixtoCmd.ExecuteScalarAsync()).ToString();
+                                    using (SqlCommand tiempoPromedioMixtoCmd = new SqlCommand(tiempoPromedioMixtoQuery, connection))
+                                    {
+                                        tiempoPromedioMixtoCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        tiempoPromedioMixtoCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string tiempoPromedioMixto = (await tiempoPromedioMixtoCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Tiempo promedio (Mixto): {tiempoPromedioMixto}", bodyFont));
+                                    }
+                                }
+                                // Mostrar totales si las opciones están activadas
+                                if (orden[3])
+                                {
+                                    pdfDoc.Add(new Paragraph($"Número de hombres: {hombres}", bodyFont));
+                                }
+                                if (orden[4])
+                                {
+                                    pdfDoc.Add(new Paragraph($"Número de mujeres: {mujeres}", bodyFont));
+                                }
                             }
-                            reporteData.Add($"Tiempo promedio (mixto): {tiempoPromedioMixto}");
-                        }
 
-                        // Número de hombres y mujeres (consultas separadas ya hechas)
-                        if (orden[3] == true)
-                        {
-                            reporteData.Add($"Número de hombres: {hombres}");
-                        }
-                        if (orden[4] == true)
-                        {
-                            reporteData.Add($"Número de mujeres: {mujeres}");
-                        }
-
-                        if(mujeres > 0)
-                        {
-                            // ================================
-                            // SOLO MUJERES
-                            // ================================
-
-                            // Podio de mujeres (Top 3)
-                            if (orden[5] == true)
+                            // --- Sección Mujeres ---
+                            if (orden[5] || orden[6] || orden[7])
                             {
-                                string podioMujeresQuery = @"
+                                pdfDoc.Add(new Paragraph("\nSección Mujeres", subtitleFont));
+                                pdfDoc.Add(new Paragraph("\n", bodyFont));
+                                if (orden[5])
+                                {
+                                    pdfDoc.Add(new Paragraph("Podio Mujeres:", bodyFont));
+                                    string podioMujeresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -2979,28 +2983,26 @@ SELECT TOP 3
     T1, T2, T3, TiempoTotal
 FROM Posiciones
 ORDER BY Posicion;";
-                                reporteData.Add("\nPodio Mujeres:");
-                                using (SqlCommand podioMujeresCmd = new SqlCommand(podioMujeresQuery, connection))
-                                {
-                                    podioMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    podioMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    using (SqlDataReader reader = await podioMujeresCmd.ExecuteReaderAsync())
+                                    using (SqlCommand podioMujeresCmd = new SqlCommand(podioMujeresQuery, connection))
                                     {
-                                        while (await reader.ReadAsync())
+                                        podioMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        podioMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        using (SqlDataReader reader = await podioMujeresCmd.ExecuteReaderAsync())
                                         {
-                                            string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
-                                                $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
-                                                $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
-                                            reporteData.Add(linea);
+                                            while (await reader.ReadAsync())
+                                            {
+                                                string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
+                                                                 $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
+                                                                 $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
+                                                pdfDoc.Add(new Paragraph(linea, bodyFont));
+                                            }
                                         }
                                     }
                                 }
-                            }
-
-                            // Menor tiempo de mujeres
-                            if (orden[6] == true)
-                            {
-                                string menorTiempoMujeresQuery = @"
+                                if (orden[6])
+                                {
+                                    pdfDoc.Add(new Paragraph("Menor tiempo (Mujeres):", bodyFont));
+                                    string menorTiempoMujeresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -3026,20 +3028,18 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMujeres
 FROM TotalTiempos;";
-                                string menorTiempoMujeres = "00:00:00";
-                                using (SqlCommand menorMujeresCmd = new SqlCommand(menorTiempoMujeresQuery, connection))
-                                {
-                                    menorMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    menorMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    menorTiempoMujeres = (await menorMujeresCmd.ExecuteScalarAsync()).ToString();
+                                    using (SqlCommand menorMujeresCmd = new SqlCommand(menorTiempoMujeresQuery, connection))
+                                    {
+                                        menorMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        menorMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string menorTiempoMujeres = (await menorMujeresCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Menor tiempo (Mujeres): {menorTiempoMujeres}", bodyFont));
+                                    }
                                 }
-                                reporteData.Add($"Menor tiempo (mujeres): {menorTiempoMujeres}");
-                            }
-
-                            // Tiempo promedio de mujeres
-                            if (orden[7] == true)
-                            {
-                                string tiempoPromedioMujeresQuery = @"
+                                if (orden[7])
+                                {
+                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Mujeres):", bodyFont));
+                                    string tiempoPromedioMujeresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -3065,31 +3065,25 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioMujeres
 FROM TotalTiempos;";
-                                string tiempoPromedioMujeres = "00:00:00";
-                                using (SqlCommand tiempoPromedioMujeresCmd = new SqlCommand(tiempoPromedioMujeresQuery, connection))
-                                {
-                                    tiempoPromedioMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    tiempoPromedioMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    tiempoPromedioMujeres = (await tiempoPromedioMujeresCmd.ExecuteScalarAsync()).ToString();
+                                    using (SqlCommand tiempoPromedioMujeresCmd = new SqlCommand(tiempoPromedioMujeresQuery, connection))
+                                    {
+                                        tiempoPromedioMujeresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        tiempoPromedioMujeresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string tiempoPromedioMujeres = (await tiempoPromedioMujeresCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Tiempo promedio (Mujeres): {tiempoPromedioMujeres}", bodyFont));
+                                    }
                                 }
-                                reporteData.Add($"Tiempo promedio (mujeres): {tiempoPromedioMujeres}");
                             }
-                        }else if (orden[5] == true || orden[6] == true || orden[7] == true)
-                        {
-                            reporteData.Add("No hay información acerca de las mujeres.");
-                        }
 
-                        // ================================
-                        // SOLO HOMBRES
-                        // ================================
-                        if (hombres > 0)
-                        {
-
-
-                            // Podio de hombres (Top 3)
-                            if (orden[8] == true)
+                            // --- Sección Hombres ---
+                            if (orden[8] || orden[9] || orden[10])
                             {
-                                string podioHombresQuery = @"
+                                pdfDoc.Add(new Paragraph("\nSección Hombres", subtitleFont));
+                                pdfDoc.Add(new Paragraph("\n", bodyFont));
+                                if (orden[8])
+                                {
+                                    pdfDoc.Add(new Paragraph("Podio Hombres:", bodyFont));
+                                    string podioHombresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -3133,28 +3127,26 @@ SELECT TOP 3
     T1, T2, T3, TiempoTotal
 FROM Posiciones
 ORDER BY Posicion;";
-                                reporteData.Add("\nPodio Hombres:");
-                                using (SqlCommand podioHombresCmd = new SqlCommand(podioHombresQuery, connection))
-                                {
-                                    podioHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    podioHombresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    using (SqlDataReader reader = await podioHombresCmd.ExecuteReaderAsync())
+                                    using (SqlCommand podioHombresCmd = new SqlCommand(podioHombresQuery, connection))
                                     {
-                                        while (await reader.ReadAsync())
+                                        podioHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        podioHombresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        using (SqlDataReader reader = await podioHombresCmd.ExecuteReaderAsync())
                                         {
-                                            string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
-                                                $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
-                                                $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
-                                            reporteData.Add(linea);
+                                            while (await reader.ReadAsync())
+                                            {
+                                                string linea = $"Posición: {reader["Posicion"]}, Número: {reader["num_corredor"]}, " +
+                                                                 $"Nombre: {reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}, " +
+                                                                 $"T1: {reader["T1"]}, T2: {reader["T2"]}, T3: {reader["T3"]}, Tiempo Total: {reader["TiempoTotal"]}";
+                                                pdfDoc.Add(new Paragraph(linea, bodyFont));
+                                            }
                                         }
                                     }
                                 }
-                            }
-
-                            // Menor tiempo de hombres
-                            if (orden[9] == true)
-                            {
-                                string menorTiempoHombresQuery = @"
+                                if (orden[9])
+                                {
+                                    pdfDoc.Add(new Paragraph("Menor tiempo (Hombres):", bodyFont));
+                                    string menorTiempoHombresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -3180,20 +3172,18 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoHombres
 FROM TotalTiempos;";
-                                string menorTiempoHombres = "00:00:00";
-                                using (SqlCommand menorHombresCmd = new SqlCommand(menorTiempoHombresQuery, connection))
-                                {
-                                    menorHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    menorHombresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    menorTiempoHombres = (await menorHombresCmd.ExecuteScalarAsync()).ToString();
+                                    using (SqlCommand menorHombresCmd = new SqlCommand(menorTiempoHombresQuery, connection))
+                                    {
+                                        menorHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        menorHombresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string menorTiempoHombres = (await menorHombresCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Menor tiempo (Hombres): {menorTiempoHombres}", bodyFont));
+                                    }
                                 }
-                                reporteData.Add($"Menor tiempo (hombres): {menorTiempoHombres}");
-                            }
-
-                            // Tiempo promedio de hombres
-                            if (orden[10] == true)
-                            {
-                                string tiempoPromedioHombresQuery = @"
+                                if (orden[10])
+                                {
+                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Hombres):", bodyFont));
+                                    string tiempoPromedioHombresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
         folio_chip,
@@ -3219,77 +3209,34 @@ TotalTiempos AS (
 )
 SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioHombres
 FROM TotalTiempos;";
-                                string tiempoPromedioHombres = "00:00:00";
-                                using (SqlCommand tiempoPromedioHombresCmd = new SqlCommand(tiempoPromedioHombresQuery, connection))
-                                {
-                                    tiempoPromedioHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
-                                    tiempoPromedioHombresCmd.Parameters.AddWithValue("@categoria", categoria);
-                                    tiempoPromedioHombres = (await tiempoPromedioHombresCmd.ExecuteScalarAsync()).ToString();
+                                    using (SqlCommand tiempoPromedioHombresCmd = new SqlCommand(tiempoPromedioHombresQuery, connection))
+                                    {
+                                        tiempoPromedioHombresCmd.Parameters.AddWithValue("@carreraId", carreraId);
+                                        tiempoPromedioHombresCmd.Parameters.AddWithValue("@categoria", categoria);
+                                        string tiempoPromedioHombres = (await tiempoPromedioHombresCmd.ExecuteScalarAsync()).ToString();
+                                        pdfDoc.Add(new Paragraph($"Tiempo promedio (Hombres): {tiempoPromedioHombres}", bodyFont));
+                                    }
                                 }
-                                reporteData.Add($"Tiempo promedio (hombres): {tiempoPromedioHombres}");
                             }
-                        }else if(orden[8] == true || orden[9] == true || orden[10] == true)
-                        {
-                            reporteData.Add("No hay información acerca de los hombres");
-                        }
-                        cat_cont++;
+
+                            cat_cont++;
+                        } // Fin de foreach de categorías
+
+                        pdfDoc.Close();
+
+                        // Guardar el PDF en carpeta temporal
+                        string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCarrera");
+                        if (!Directory.Exists(tempFolder))
+                            Directory.CreateDirectory(tempFolder);
+                        string fileName = $"ReporteCarrera_{Guid.NewGuid()}.pdf";
+                        string filePath = Path.Combine(tempFolder, fileName);
+                        System.IO.File.WriteAllBytes(filePath, ms.ToArray());
+
+                        // Generar la URL de descarga
+                        string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName = fileName });
+                        return Json(new { success = true, downloadUrl = downloadUrl });
                     }
                 }
-
-                // ===============================
-                // Generación del PDF usando iTextSharp (Tamaño Carta)
-                // ===============================
-                // Se utiliza FileStream para crear y escribir el archivo PDF
-                using (var ms = new MemoryStream())
-                {
-                    // Crear el documento en tamaño carta (Letter) con márgenes de 50 unidades
-                    Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
-                    PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
-                    pdfDoc.Open();
-
-                    // Definir las fuentes a usar
-                    Font titleFont = FontFactory.GetFont("Arial", 16, Font.BOLD);
-                    Font bodyFont = FontFactory.GetFont("Arial", 12, Font.NORMAL);
-
-                    // Título principal
-                    Paragraph title = new Paragraph("Reporte de Carrera", titleFont)
-                    {
-                        Alignment = Element.ALIGN_CENTER
-                    };
-                    pdfDoc.Add(title);
-
-                    // Espacio adicional
-                    pdfDoc.Add(new Paragraph("\n", bodyFont));
-
-                    // Agregar cada línea del reporte
-                    foreach (var line in reporteData)
-                    {
-                        Paragraph p = new Paragraph(line, bodyFont)
-                        {
-                            SpacingAfter = 5 // Espacio entre líneas
-                        };
-                        pdfDoc.Add(p);
-                    }
-
-                    // Cerrar el documento
-                    pdfDoc.Close();
-
-                    // Guardar el PDF en una carpeta temporal
-                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCarrera");
-                    if (!Directory.Exists(tempFolder))
-                    {
-                        Directory.CreateDirectory(tempFolder);
-                    }
-                    string fileName = $"ReporteCarrera_{Guid.NewGuid()}.pdf";
-                    string filePath = Path.Combine(tempFolder, fileName);
-                    System.IO.File.WriteAllBytes(filePath, ms.ToArray());
-
-                    // Generar la URL de descarga (asumiendo que tienes una acción DownloadReporte)
-                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName = fileName });
-                    return Json(new { success = true, downloadUrl = downloadUrl });
-                }
-                // ===============================
-                // Fin de la generación del PDF con iTextSharp
 
                 return Json(new { success = true, message = "Reporte PDF generado correctamente." });
             }
