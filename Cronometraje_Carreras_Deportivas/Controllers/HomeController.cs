@@ -2601,14 +2601,14 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                 string carreraAño = "";
                 string carreraEdicion = "";
 
-                // Lista de categorías (se filtrará posteriormente)
+                // Lista de categorías
                 var categorias = new List<string>();
 
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // 1. Obtener los datos básicos de la carrera
+                    // 1. Obtener datos básicos de la carrera
                     string carreraInfoQuery = @"
                 SELECT 
                     nom_carrera AS NombreCarrera, 
@@ -2632,7 +2632,7 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         }
                     }
 
-                    // 2. Obtener las categorías asociadas a la carrera
+                    // 2. Obtener categorías asociadas a la carrera
                     string categoriasQuery = @"
                 SELECT DISTINCT cat.nombre_categoria
                 FROM CARR_Cat cc
@@ -2650,7 +2650,7 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         }
                     }
 
-                    // 3. Filtrar la categoría con menor km y limitar si hay más de 2
+                    // 3. Filtrar la categoría con menor km y limitar a 2 si es necesario
                     if (categorias.Count > 0)
                     {
                         var categoriasKm = categorias.Select(c =>
@@ -2671,10 +2671,9 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         categorias = categoriasFiltradas.Select(x => x.Nombre).ToList();
                     }
 
-                    // Variable para seleccionar las opciones (booleanos) según la categoría
                     int cat_cont = 0;
 
-                    // 4. Generar el PDF con iTextSharp (estructura formal)
+                    // 4. Generar PDF con iTextSharp (estructura formal)
                     using (var ms = new MemoryStream())
                     {
                         Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
@@ -2684,23 +2683,36 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                         // Definir fuentes
                         var coverTitleFont = FontFactory.GetFont("Arial", 20, Font.BOLD);
                         var coverInfoFont = FontFactory.GetFont("Arial", 14, Font.NORMAL);
-                        var categoryTitleFont = FontFactory.GetFont("Arial", 16, Font.BOLD);
+                        var categoryTitleFont = FontFactory.GetFont("Arial", 18, Font.BOLD);
                         var subtitleFont = FontFactory.GetFont("Arial", 14, Font.BOLD);
                         var bodyFont = FontFactory.GetFont("Arial", 12, Font.NORMAL);
 
-                        // --- Portada ---
-                        Paragraph coverTitle = new Paragraph("Reporte de Carrera", coverTitleFont)
-                        {
-                            Alignment = Element.ALIGN_CENTER
-                        };
-                        pdfDoc.Add(coverTitle);
-                        pdfDoc.Add(new Paragraph("\n"));
-                        pdfDoc.Add(new Paragraph($"Carrera: {carreraNombre}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
-                        pdfDoc.Add(new Paragraph($"Año: {carreraAño}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
-                        pdfDoc.Add(new Paragraph($"Edición: {carreraEdicion}", coverInfoFont) { Alignment = Element.ALIGN_CENTER });
-                        pdfDoc.NewPage(); // Salto de página tras la portada
+                        // --- Portada centrada vertical y horizontalmente ---
+                        PdfPTable coverTable = new PdfPTable(1);
+                        coverTable.WidthPercentage = 100;
+                        // Ajustar el ancho total al área disponible
+                        coverTable.TotalWidth = pdfDoc.PageSize.Width - pdfDoc.LeftMargin - pdfDoc.RightMargin;
+                        PdfPCell coverCell = new PdfPCell();
+                        coverCell.Border = Rectangle.NO_BORDER;
+                        // Fijar la altura a la altura disponible de la página
+                        coverCell.FixedHeight = pdfDoc.PageSize.Height - pdfDoc.TopMargin - pdfDoc.BottomMargin;
+                        coverCell.VerticalAlignment = Element.ALIGN_MIDDLE;
+                        coverCell.HorizontalAlignment = Element.ALIGN_CENTER;
 
-                        // --- Por cada categoría, una nueva página con secciones ---
+                        Paragraph coverParagraph = new Paragraph();
+                        coverParagraph.Alignment = Element.ALIGN_CENTER;
+                        coverParagraph.Add(new Chunk("Reporte de Carrera\n", coverTitleFont));
+                        coverParagraph.Add(new Chunk($"\nCarrera: {carreraNombre}\n", coverInfoFont));
+                        coverParagraph.Add(new Chunk($"Año: {carreraAño}\n", coverInfoFont));
+                        coverParagraph.Add(new Chunk($"Edición: {carreraEdicion}\n", coverInfoFont));
+
+                        coverCell.AddElement(coverParagraph);
+                        coverTable.AddCell(coverCell);
+                        pdfDoc.Add(coverTable);
+
+                        pdfDoc.NewPage();
+
+                        // --- Por cada categoría, una nueva página ---
                         foreach (var categoria in categorias)
                         {
                             // Seleccionar el arreglo de opciones correspondiente
@@ -2716,9 +2728,12 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                             }
 
                             pdfDoc.NewPage();
-                            // Encabezado de la categoría
-                            pdfDoc.Add(new Paragraph($"Categoría: {categoria}", categoryTitleFont));
-                            pdfDoc.Add(new Paragraph(new string('-', 50), bodyFont));
+
+                            // Encabezado de la categoría centrado
+                            Paragraph categoryHeader = new Paragraph($"Categoría: {categoria}", categoryTitleFont);
+                            categoryHeader.Alignment = Element.ALIGN_CENTER;
+                            pdfDoc.Add(categoryHeader);
+                            pdfDoc.Add(new Paragraph("\n", bodyFont)); // espacio
 
                             // Verificar participantes en la categoría
                             string verificarParticipantesQuery = @"
@@ -2742,7 +2757,7 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                                 continue;
                             }
 
-                            // Obtener totales de hombres y mujeres
+                            // Totales de hombres y mujeres
                             int hombres = 0, mujeres = 0;
                             string totalHombresQuery = @"
                         SELECT COUNT(*) 
@@ -2778,8 +2793,11 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                             // --- Sección Mixta ---
                             if (orden[0] || orden[1] || orden[2] || orden[3] || orden[4])
                             {
-                                pdfDoc.Add(new Paragraph("Sección Mixta", subtitleFont));
+                                Paragraph mixtoSubtitle = new Paragraph("Sección Mixta", subtitleFont);
+                                mixtoSubtitle.Alignment = Element.ALIGN_LEFT;
+                                pdfDoc.Add(mixtoSubtitle);
                                 pdfDoc.Add(new Paragraph("\n", bodyFont));
+
                                 // Podio Mixto
                                 if (orden[0])
                                 {
@@ -2809,8 +2827,7 @@ Posiciones AS (
         CONVERT(TIME, DATEADD(SECOND, 
             DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 
-            0)) AS TiempoTotal
+            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -2848,10 +2865,9 @@ ORDER BY Posicion;";
                                         }
                                     }
                                 }
-                                // Menor tiempo Mixto
+                                // Menor tiempo Mixto (sin línea duplicada)
                                 if (orden[1])
                                 {
-                                    pdfDoc.Add(new Paragraph("Menor tiempo (Mixto):", bodyFont));
                                     string menorTiempoMixtoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -2884,10 +2900,9 @@ FROM TotalTiempos;";
                                         pdfDoc.Add(new Paragraph($"Menor tiempo (Mixto): {menorTiempoMixto}", bodyFont));
                                     }
                                 }
-                                // Tiempo promedio Mixto
+                                // Tiempo promedio Mixto (sin duplicado)
                                 if (orden[2])
                                 {
-                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Mixto):", bodyFont));
                                     string tiempoPromedioMixtoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -2920,7 +2935,6 @@ FROM TotalTiempos;";
                                         pdfDoc.Add(new Paragraph($"Tiempo promedio (Mixto): {tiempoPromedioMixto}", bodyFont));
                                     }
                                 }
-                                // Mostrar totales si las opciones están activadas
                                 if (orden[3])
                                 {
                                     pdfDoc.Add(new Paragraph($"Número de hombres: {hombres}", bodyFont));
@@ -2934,7 +2948,9 @@ FROM TotalTiempos;";
                             // --- Sección Mujeres ---
                             if (orden[5] || orden[6] || orden[7])
                             {
-                                pdfDoc.Add(new Paragraph("\nSección Mujeres", subtitleFont));
+                                Paragraph mujeresSubtitle = new Paragraph("Sección Mujeres", subtitleFont);
+                                mujeresSubtitle.Alignment = Element.ALIGN_LEFT;
+                                pdfDoc.Add(mujeresSubtitle);
                                 pdfDoc.Add(new Paragraph("\n", bodyFont));
                                 if (orden[5])
                                 {
@@ -2964,8 +2980,7 @@ Posiciones AS (
         CONVERT(TIME, DATEADD(SECOND, 
             DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 
-            0)) AS TiempoTotal
+            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -3001,7 +3016,6 @@ ORDER BY Posicion;";
                                 }
                                 if (orden[6])
                                 {
-                                    pdfDoc.Add(new Paragraph("Menor tiempo (Mujeres):", bodyFont));
                                     string menorTiempoMujeresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -3038,7 +3052,6 @@ FROM TotalTiempos;";
                                 }
                                 if (orden[7])
                                 {
-                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Mujeres):", bodyFont));
                                     string tiempoPromedioMujeresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -3078,7 +3091,9 @@ FROM TotalTiempos;";
                             // --- Sección Hombres ---
                             if (orden[8] || orden[9] || orden[10])
                             {
-                                pdfDoc.Add(new Paragraph("\nSección Hombres", subtitleFont));
+                                Paragraph hombresSubtitle = new Paragraph("Sección Hombres", subtitleFont);
+                                hombresSubtitle.Alignment = Element.ALIGN_LEFT;
+                                pdfDoc.Add(hombresSubtitle);
                                 pdfDoc.Add(new Paragraph("\n", bodyFont));
                                 if (orden[8])
                                 {
@@ -3108,8 +3123,7 @@ Posiciones AS (
         CONVERT(TIME, DATEADD(SECOND, 
             DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 
-            0)) AS TiempoTotal
+            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -3145,7 +3159,6 @@ ORDER BY Posicion;";
                                 }
                                 if (orden[9])
                                 {
-                                    pdfDoc.Add(new Paragraph("Menor tiempo (Hombres):", bodyFont));
                                     string menorTiempoHombresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -3182,7 +3195,6 @@ FROM TotalTiempos;";
                                 }
                                 if (orden[10])
                                 {
-                                    pdfDoc.Add(new Paragraph("Tiempo promedio (Hombres):", bodyFont));
                                     string tiempoPromedioHombresQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
