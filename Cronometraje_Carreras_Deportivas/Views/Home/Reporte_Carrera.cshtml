@@ -4,47 +4,204 @@
 
 <nav class="navbar navbar-expand-sm header">
     <div class="container-fluid">
-        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt=""
+             style="max-width: 15%;">
     </div>
 </nav>
 
-<div class="container" style="display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.05);">
-    <div class="modal-content" style="width: 600px; padding: 20px; border-radius: 8px; background: white; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);">
-        <h2>Generar reporte del corredor</h2>
+<div class="modal-dialog modal-lg">
+    <div class="modal-content">
 
-        <form id="reporte-carrera-form" class="form">
-            <!-- Desplegable de carrera -->
-            <div class="form-group">
-                <label for="CarreraId">Seleccione una Carrera <span class="text-danger">*</span></label>
-                <select id="CarreraId" name="CarreraId" class="form-control" required>
-                    <option value="" disabled selected>Seleccione una Carrera</option>
-                    @foreach (var carrera in ViewBag.Carreras)
-                    {
-                        <option value="@carrera.Value">@carrera.Text</option>
-                    }
-                </select>
+        <div class="modal-header" id="cabeceraMenu">
+            <h5 class="modal-title" id="menuReporteCarrera">Datos de reporte general</h5>
+        </div>
+        <div class="modal-body">
+            <div class="row">
+
+                <div class="col">
+                    <div class="btn-group col">
+                        <div class="form-group">
+                            <label for="CarreraId">Seleccione una Carrera <span class="text-danger">*</span></label>
+                            <select id="CarreraId" name="CarreraId" class="form-control" required>
+                                <option value="" disabled selected>Seleccione una Carrera</option>
+                                @foreach (var carrera in ViewBag.Carreras)
+                                {
+                                    <option value="@carrera.Value">@carrera.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Cajas readonly para categorías -->
-            <div class="form-group">
-                <label>Categorías disponibles:</label>
-                <input type="text" id="Categoria1" class="form-control" readonly placeholder="Categoría 1">
-                <input type="text" id="Categoria2" class="form-control" readonly placeholder="Categoría 2">
-                <input type="text" id="Categoria3" class="form-control" readonly placeholder="Categoría 3">
-            </div>
+            <div class="d-flex gap-5 col-12 mx-auto">
+                <dl class="row">
 
-            <!-- Caja para ruta del archivo -->
-            <div class="form-group">
-                <label for="RutaArchivo">Ruta para guardar el reporte <span class="text-danger">*</span></label>
-                <input type="text" id="RutaArchivo" name="RutaArchivo" class="form-control" placeholder="C:\ruta\del\archivo.pdf" required>
-            </div>
+                    <dt class="col-sm-4">
+                        <h5>Mixta 10km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPodioMixto">
+                            <label class="form-check-label" for="PrimerPodioMixto">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimeroMenorTMixto">
+                            <label class="form-check-label" for="PrimeroMenorTMixto">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPromTMixto">
+                            <label class="form-check-label" for="PrimerPromTMixto">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerNumHom">
+                            <label class="form-check-label" for="PrimerNumHom">
+                                Num. Hombres
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerNumMuj">
+                            <label class="form-check-label" for="PrimerNumMuj">
+                                Num. Mujeres
+                            </label>
+                        </div>
+                    </dt>
 
-            <!-- Botones -->
-            <div class="form-row buttons-row">
-                <button type="button" id="cancelar-btn" class="btn btn-cancel">Cancelar</button>
-                <button type="button" id="generar-btn" class="btn btn-create">Generar Reporte</button>
+                    <dt class="col-sm-4">
+                        <h5>Mujeres 10km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPodioMuj">
+                            <label class="form-check-label" for="PrimerPodioMuj">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerMenorTMuj">
+                            <label class="form-check-label" for="PrimerMenorTMuj">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPromTMuj">
+                            <label class="form-check-label" for="PrimerPromTMuj">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                    </dt>
+
+                    <dt class="col-sm-4">
+                        <h5>Hombres 10km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPodioHom">
+                            <label class="form-check-label" for="PrimerPodioHom">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerMenorTHom">
+                            <label class="form-check-label" for="PrimerMenorTHom">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="PrimerPromTHom">
+                            <label class="form-check-label" for="PrimerPromTHom">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                    </dt>
+
+                    <dt class="col-sm-4">
+                        <h5>Mixta 21km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPodioMixto">
+                            <label class="form-check-label" for="SegundoPodioMixto">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoMenorTMixto">
+                            <label class="form-check-label" for="SegundoMenorTMixto">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPromTMixto">
+                            <label class="form-check-label" for="SegundoPromTMixto">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoNumHom">
+                            <label class="form-check-label" for="SegundoNumHom">
+                                Num. Hombres
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoNumMuj">
+                            <label class="form-check-label" for="SegundoNumMuj">
+                                Num. Mujeres
+                            </label>
+                        </div>
+                    </dt>
+
+                    <dt class="col-sm-4">
+                        <h5>Mujeres 21km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPodioMuj">
+                            <label class="form-check-label" for="SegundoPodioMuj">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoMenorTMuj">
+                            <label class="form-check-label" for="SegundoMenorTMuj">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPromTMuj">
+                            <label class="form-check-label" for="SegundoPromTMuj">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                    </dt>
+
+                    <dt class="col-sm-4">
+                        <h5>Hombres 21km:</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPodioHom">
+                            <label class="form-check-label" for="SegundoPodioHom">
+                                Podio
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoMenorTHom">
+                            <label class="form-check-label" for="SegundoMenorTHom">
+                                Menor tiempo
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value=true id="SegundoPromTHom">
+                            <label class="form-check-label" for="SegundoPromTHom">
+                                Tiempo promedio
+                            </label>
+                        </div>
+                    </dt>
+                </dl>
             </div>
-        </form>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button type="button" class="btn btn-danger" id="cancelar-btn">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="generar-btn">Crear</button>
+            </div>
+        </div>
+
+
     </div>
 </div>
 
@@ -52,16 +209,38 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
+    function obtenerListadeBooleanos () {
+        var ListaBooleana2 = 
+            [$('#SegundoPodioMixto').prop('checked'), $('#SegundoMenorTMixto').prop('checked'), $('#SegundoPromTMixto').prop('checked'), $('#SegundoNumHom').prop('checked'), $('#SegundoNumMuj').prop('checked'),
+             $('#SegundoPodioMuj').prop('checked'), $('#SegundoMenorTMuj').prop('checked'), $('#SegundoPromTMuj').prop('checked'),
+             $('#SegundoPodioHom').prop('checked'), $('#SegundoMenorTHom').prop('checked'), $('#SegundoPromTHom').prop('checked')];
+        var ListaBooleana1 = 
+            [$('#PrimerPodioMixto').prop('checked'), $('#PrimeroMenorTMixto').prop('checked'), $('#PrimerPromTMixto').prop('checked'), $('#PrimerNumHom').prop('checked'), $('#PrimerNumMuj').prop('checked'),
+             $('#PrimerPodioMuj').prop('checked'), $('#PrimerMenorTMuj').prop('checked'), $('#PrimerPromTMuj').prop('checked'),
+             $('#PrimerPodioHom').prop('checked'), $('#PrimerMenorTHom').prop('checked'), $('#PrimerPromTHom').prop('checked')];
+
+        return [ListaBooleana1, ListaBooleana2];
+    }
+
     $(document).ready(function () {
         // Cargar categorías dinámicamente
         $("#CarreraId").change(function () {
             const carreraId = $(this).val();
             if (carreraId) {
                 $.getJSON(`/Home/ObtenerCategoriasPorCarrera_Reporte?carreraId=${carreraId}`, function (categorias) {
-                    for (let i = 0; i < 3; i++) {
-                        $(`#Categoria${i + 1}`).val(categorias[i] || "");
+                    if (categorias && categorias.length === 2) {
+                        $("#Categoria1").val(categorias[0]);
+                        $("#Categoria2").val(categorias[1]);
+                    } else {
+                        // Si no se obtienen dos categorías, se asigna el template "XXkm"
+                        $("#Categoria1").val("XXkm");
+                        $("#Categoria2").val("XXkm");
                     }
                 });
+            } else {
+                // Si no hay carrera seleccionada, se muestra el template por defecto
+                $("#Categoria1").val("XXkm");
+                $("#Categoria2").val("XXkm");
             }
         });
 
@@ -73,24 +252,27 @@
         // Manejo del botón "Generar Reporte"
         $("#generar-btn").click(function () {
             const carreraId = $("#CarreraId").val();
-            const rutaArchivo = $("#RutaArchivo").val();
 
-            if (!carreraId || !rutaArchivo) {
+            if (!carreraId) {
                 Swal.fire({
                     icon: "error",
                     title: "Error",
-                    text: "Por favor, selecciona una carrera y proporciona una ruta para guardar el reporte.",
+                    text: "Por favor, selecciona una carrera.",
                 });
                 return;
             }
 
-            $.post("/Home/GenerarReporteCarrera", { carreraId, rutaArchivo }, function (response) {
+            // Armar la lista de booleanos para hacer reportes apropiados
+            var [lista1, lista2] = obtenerListadeBooleanos();
+
+            $.post("/Home/GenerarReporteCarrera", { carreraId, lista1, lista2 }, function (response) {
                 if (response.success) {
                     Swal.fire({
                         icon: "success",
                         title: "Éxito",
                         text: "El reporte se generó correctamente.",
                     }).then(() => {
+                        window.open(response.downloadUrl, '_blank');
                         window.location.href = "/Home/Pantalla_ini";
                     });
                 } else {
