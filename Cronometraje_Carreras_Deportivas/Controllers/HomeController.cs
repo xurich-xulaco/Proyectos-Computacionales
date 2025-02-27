@@ -235,7 +235,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return View("Baja_administrador");
             }
         }
-
+        
         [HttpPost]
         public async Task<IActionResult> BuscarCorredores(int? yearCarrera, int? ediCarrera, string categoria, string nombreCorredor)
         {

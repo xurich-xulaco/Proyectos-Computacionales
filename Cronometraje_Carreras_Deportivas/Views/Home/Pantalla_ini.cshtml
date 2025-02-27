@@ -47,42 +47,61 @@
 <br>
 
 <div>
-<form id="searchForm" method="post" action="@Url.Action("BuscarCorredores", "Home")">
-    <!-- Formulario en una línea con distribución de dos mitades -->
-    <div class="d-flex justify-content-between">
-        <div class="w-50">
-            <div class="form-group w-100">
-                <label for="nombreCorredor">Nombre del Corredor:</label>
-                <input type="text" id="nombreCorredor" name="nombreCorredor" value="@ViewBag.NombreBuscado">
+    <form id="searchForm" method="post" asp-action="BuscarCorredores">
+        <div class="row align-items-center">
+            <div class="col-1"></div> <!-- Espaciado a la izquierda -->
+            <!-- Nombre del Corredor -->
+            <div class="col">
+                <label for="nombreCorredor" class="form-label"><strong>Nombre del Corredor:</strong></label>
+                <input type="text" name="nombreCorredor" id="nombreCorredor" class="form-control"
+                       value="@ViewBag.NombreBuscado" placeholder="Nombre del corredor" />
             </div>
-        </div>
-        <div class="w-50 d-flex justify-content-end">
-            <div class="form-group mx-2">
-                <label for="yearDropdown">Año:</label>
-                <select id="yearDropdown" name="yearCarrera" class="form-control">
-                    <option value="">Selecciona un año</option>
-                    @foreach (var year in ViewBag.Anios)
+
+            <!-- Año -->
+            <div class="col">
+                <label for="yearCarrera" class="form-label"><strong>Año:</strong></label>
+                <select id="yearCarrera" name="yearCarrera" class="form-control">
+                    <option value="">Seleccione un año</option>
+                    @foreach (var anio in ViewBag.Anios)
                     {
-                        <option value="@year">@year</option>
+                        var isSelected = Convert.ToString(ViewBag.SelectedYear) == Convert.ToString(anio) ? "selected" : "";
+                        <option value="@anio" selected="@isSelected">@anio</option>
                     }
                 </select>
             </div>
-            <div class="form-group mx-2">
-                <label for="edicionDropdown">Edición:</label>
-                <select id="edicionDropdown" name="ediCarrera" class="form-control" disabled>
-                    <option value="">Selecciona una edición</option>
+
+            <!-- Edición -->
+            <div class="col">
+                <label for="ediCarrera" class="form-label"><strong>Edición:</strong></label>
+                <select id="ediCarrera" name="ediCarrera" class="form-control">
+                    <option value="">Seleccione una edición</option>
+                    @if (ViewBag.SelectedEdition != null)
+                    {
+                        <option value="@ViewBag.SelectedEdition" selected>@ViewBag.SelectedEdition</option>
+                    }
                 </select>
             </div>
-            <div class="form-group mx-2">
-                <label for="categoriaDropdown">Categoría:</label>
-                <select id="categoriaDropdown" name="categoria" class="form-control" disabled>
-                    <option value="">Selecciona una categoría</option>
+
+            <!-- Categoría -->
+            <div class="col">
+                <label for="categoria" class="form-label"><strong>Categoría:</strong></label>
+                <select id="categoria" name="categoria" class="form-control">
+                    <option value="">Seleccione una categoría</option>
+                    @if (!string.IsNullOrEmpty(ViewBag.SelectedCategory))
+                    {
+                        <option value="@ViewBag.SelectedCategory" selected>@ViewBag.SelectedCategory</option>
+                    }
                 </select>
             </div>
-            <button type="submit" class="btn btn-primary mx-2">Buscar</button>
+
+            <!-- Botón de Búsqueda -->
+            <div class="col">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+            </div>
         </div>
-    </div>
-</form>
+    </form>
+
+
 </div>
 @if (!string.IsNullOrEmpty(ViewBag.Error))
 {
@@ -351,5 +370,83 @@
             .then(response => {
                 window.location.replace("/Home/Index"); // Redirige sin guardar en el historial
             });
+    });
+    document.addEventListener("DOMContentLoaded", function () {
+        const yearSelect = document.getElementById("yearCarrera");
+        const ediSelect = document.getElementById("ediCarrera");
+        const catSelect = document.getElementById("categoria");
+        const nameInput = document.getElementById("nombreCorredor");
+
+        // 🔹 Restaurar valores guardados en localStorage después de una búsqueda
+        yearSelect.value = localStorage.getItem("yearCarrera") || "";
+        ediSelect.value = localStorage.getItem("ediCarrera") || "";
+        catSelect.value = localStorage.getItem("categoria") || "";
+        nameInput.value = localStorage.getItem("nombreCorredor") || "";
+
+        // 🔹 Guardar valores en localStorage antes de enviar el formulario
+        document.getElementById("searchForm").addEventListener("submit", function () {
+            localStorage.setItem("yearCarrera", yearSelect.value);
+            localStorage.setItem("ediCarrera", ediSelect.value);
+            localStorage.setItem("categoria", catSelect.value);
+            localStorage.setItem("nombreCorredor", nameInput.value);
+        });
+
+        // 🔹 Función para cargar ediciones cuando se selecciona un año
+        function cargarEdiciones() {
+            let year = yearSelect.value;
+            ediSelect.innerHTML = '<option value="">Seleccione una edición</option>';
+            catSelect.innerHTML = '<option value="">Seleccione una categoría</option>'; // Resetear categorías
+
+            if (year) {
+                fetch(`/Home/CargarEdiciones?yearCarrera=${year}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(edi => {
+                            let selected = edi == localStorage.getItem("ediCarrera") ? "selected" : "";
+                            ediSelect.innerHTML += `<option value="${edi}" ${selected}>${edi}</option>`;
+                        });
+
+                        // Si hay ediciones cargadas y había una selección previa, dispara el evento de cambio
+                        if (localStorage.getItem("ediCarrera")) {
+                            ediSelect.value = localStorage.getItem("ediCarrera");
+                            cargarCategorias();
+                        }
+                    })
+                    .catch(error => console.error("Error al cargar ediciones:", error));
+            }
+        }
+
+        // 🔹 Función para cargar categorías cuando se selecciona una edición
+        function cargarCategorias() {
+            let year = yearSelect.value;
+            let edi = ediSelect.value;
+            catSelect.innerHTML = '<option value="">Seleccione una categoría</option>'; // Resetear categorías
+
+            if (year && edi) {
+                fetch(`/Home/CargarCategorias?yearCarrera=${year}&ediCarrera=${edi}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(cat => {
+                            let selected = cat === localStorage.getItem("categoria") ? "selected" : "";
+                            catSelect.innerHTML += `<option value="${cat}" ${selected}>${cat}</option>`;
+                        });
+
+                        // Si había una categoría seleccionada, restáurala
+                        if (localStorage.getItem("categoria")) {
+                            catSelect.value = localStorage.getItem("categoria");
+                        }
+                    })
+                    .catch(error => console.error("Error al cargar categorías:", error));
+            }
+        }
+
+        // 🔹 Eventos para cargar ediciones y categorías dinámicamente
+        yearSelect.addEventListener("change", cargarEdiciones);
+        ediSelect.addEventListener("change", cargarCategorias);
+
+        // 🔹 Disparar eventos después de cargar la página para restaurar datos
+        if (yearSelect.value) {
+            cargarEdiciones();
+        }
     });
 </script>
