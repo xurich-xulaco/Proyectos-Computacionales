@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qGCefVQg35M=",
+  "dgSpecHash": "v4FauwJ34Nc=",
   "success": true,
-  "projectFilePath": "D:\\escritorio\\Nueva carpeta\\06-12-2024\\Cronometraje_Carreras_Deportivas_funcional\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
+  "projectFilePath": "U:\\dev-c\\githup\\Proyectos-Computacionales\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\tommy\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
     "C:\\Users\\tommy\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",

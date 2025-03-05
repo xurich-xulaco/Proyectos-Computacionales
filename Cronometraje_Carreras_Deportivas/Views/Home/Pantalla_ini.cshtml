@@ -12,6 +12,42 @@
         </div>
     </div>
 </nav>
+<<<<<<< Updated upstream
+=======
+<div class="row " style="background-color:#004A98;">
+    <div class="col"></div>
+    <div class="col">
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98;  color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Modificar_Corredor", "Home")'">Modificar Corredor</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_Corredores", "Home")'">Importar corredores</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_tiempos", "Home")'">Importar tiempos</button></li>
+        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
+         </ul>
+    </div>
+    <div class="col">
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
+    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
+        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
+          </ul>
+    </div>
+    <div class="col">
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de Reportes</button>
+        <ul class="dropdown-menu" aria-labelledby="Gestion de reportes">
+            <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Generar reporte de Corredor</button></li>
+            <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
+        </ul>
+    </div>
+    <div class="col" id="btnExportar"><button class="btn " style="background-color:#004A98;color: white;width:max-content;">Exportar resultados</button></div>
+    <div class="col"></div>
+</div>
+
+
+>>>>>>> Stashed changes
 <br>
 <form id="searchForm" method="post" action="@Url.Action("BuscarCorredores", "Home")">
     <!-- Formulario en una línea con distribución de dos mitades -->
@@ -58,8 +94,13 @@
 
 <div class="row">
     <!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
+<<<<<<< Updated upstream
     <div class="col-6 ">
         <div id="resultTable" class="mt-4" style=" margin: auto;">
+=======
+
+    <div id="resultTable"  style=" margin: auto;padding: 60px">
+>>>>>>> Stashed changes
 
             <table class="table table-striped">
                 <thead>
@@ -382,4 +423,142 @@
 
     // Inicializar los datos cuando se cargue la página
     document.addEventListener('DOMContentLoaded', cargarCarreras);
+<<<<<<< Updated upstream
+=======
+</script>
+
+<script>
+    //agregado
+    document.querySelector("#logoutButton").addEventListener("click", function () {
+        fetch('/Home/Logout', { method: 'POST' })
+            .then(response => {
+                window.location.replace("/Home/Index"); // Redirige sin guardar en el historial
+            });
+    });
+    document.addEventListener("DOMContentLoaded", function () {
+        const yearSelect = document.getElementById("yearCarrera");
+        const ediSelect = document.getElementById("ediCarrera");
+        const catSelect = document.getElementById("categoria");
+        const nameInput = document.getElementById("nombreCorredor");
+
+        // 🔹 Restaurar valores guardados en localStorage después de una búsqueda
+        yearSelect.value = localStorage.getItem("yearCarrera") || "";
+        ediSelect.value = localStorage.getItem("ediCarrera") || "";
+        catSelect.value = localStorage.getItem("categoria") || "";
+        nameInput.value = localStorage.getItem("nombreCorredor") || "";
+
+        // 🔹 Guardar valores en localStorage antes de enviar el formulario
+        document.getElementById("searchForm").addEventListener("submit", function () {
+            localStorage.setItem("yearCarrera", yearSelect.value);
+            localStorage.setItem("ediCarrera", ediSelect.value);
+            localStorage.setItem("categoria", catSelect.value);
+            localStorage.setItem("nombreCorredor", nameInput.value);
+        });
+
+        // 🔹 Función para cargar ediciones cuando se selecciona un año
+        function cargarEdiciones() {
+            let year = yearSelect.value;
+            ediSelect.innerHTML = '<option value="">Seleccione una edición</option>';
+            catSelect.innerHTML = '<option value="">Seleccione una categoría</option>'; // Resetear categorías
+
+            if (year) {
+                fetch(`/Home/CargarEdiciones?yearCarrera=${year}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(edi => {
+                            let selected = edi == localStorage.getItem("ediCarrera") ? "selected" : "";
+                            ediSelect.innerHTML += `<option value="${edi}" ${selected}>${edi}</option>`;
+                        });
+
+                        // Si hay ediciones cargadas y había una selección previa, dispara el evento de cambio
+                        if (localStorage.getItem("ediCarrera")) {
+                            ediSelect.value = localStorage.getItem("ediCarrera");
+                            cargarCategorias();
+                        }
+                    })
+                    .catch(error => console.error("Error al cargar ediciones:", error));
+            }
+        }
+
+        // 🔹 Función para cargar categorías cuando se selecciona una edición
+        function cargarCategorias() {
+            let year = yearSelect.value;
+            let edi = ediSelect.value;
+            catSelect.innerHTML = '<option value="">Seleccione una categoría</option>'; // Resetear categorías
+
+            if (year && edi) {
+                fetch(`/Home/CargarCategorias?yearCarrera=${year}&ediCarrera=${edi}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(cat => {
+                            let selected = cat === localStorage.getItem("categoria") ? "selected" : "";
+                            catSelect.innerHTML += `<option value="${cat}" ${selected}>${cat}</option>`;
+                        });
+
+                        // Si había una categoría seleccionada, restáurala
+                        if (localStorage.getItem("categoria")) {
+                            catSelect.value = localStorage.getItem("categoria");
+                        }
+                    })
+                    .catch(error => console.error("Error al cargar categorías:", error));
+            }
+        }
+
+        // 🔹 Eventos para cargar ediciones y categorías dinámicamente
+        yearSelect.addEventListener("change", cargarEdiciones);
+        ediSelect.addEventListener("change", cargarCategorias);
+
+        // 🔹 Disparar eventos después de cargar la página para restaurar datos
+        if (yearSelect.value) {
+            cargarEdiciones();
+        }
+    });
+</script>
+
+<script>
+    document.getElementById("btnExportar").addEventListener("click", function () {
+        let rows = document.querySelectorAll("#resultTable tbody tr");
+        let corredores = [];
+
+        rows.forEach(row => {
+            let cols = row.querySelectorAll("td");
+            if (cols.length > 0) {
+                corredores.push({
+                    Posicion: cols[0].innerText.trim(),
+                    Numero: cols[1].innerText.trim(),
+                    Nombre: cols[2].innerText.trim(),
+                    T1: cols[3].innerText.trim(),
+                    T2: cols[4].innerText.trim(),
+                    T3: cols[5].innerText.trim(),
+                    TiempoTotal: cols[6].innerText.trim()
+                });
+            }
+        });
+
+        // Capturar los parámetros de búsqueda
+        let filtros = {
+            NombreBuscado: document.getElementById("nombreCorredor").value,
+            Año: document.getElementById("yearCarrera").value,
+            Edicion: document.getElementById("ediCarrera").value,
+            Categoria: document.getElementById("categoria").value
+        };
+
+        fetch('/Home/ExportarResultados', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filtros, corredores })
+        })
+            .then(response => response.blob())
+            .then(blob => {
+                let url = window.URL.createObjectURL(blob);
+                let a = document.createElement("a");
+                a.href = url;
+                a.download = "ResultadosBusqueda.pdf";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => console.error("Error al generar PDF:", error));
+    });
+>>>>>>> Stashed changes
 </script>

@@ -76,6 +76,109 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return View();
             }
         }
+<<<<<<< Updated upstream
+=======
+
+
+        [HttpPost]
+        public ActionResult ExportarResultados([FromBody] TablaResultadosModel data)
+        {
+            if (data == null || data.Corredores.Count == 0)
+            {
+                return new HttpStatusCodeResult(400, "No hay datos para exportar.");
+            }
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                Document document = new Document(PageSize.A4.Rotate(), 20, 20, 20, 20);
+                PdfWriter writer = PdfWriter.GetInstance(document, ms);
+
+                document.Open();
+
+                // 🔹 Agregar título con filtros de búsqueda
+                Font titleFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 16, BaseColor.BLUE);
+                string titulo = $"Resultados de la Búsqueda - Año: {data.Filtros.Año}, Edición: {data.Filtros.Edicion}, Categoría: {data.Filtros.Categoria}";
+                Paragraph title = new Paragraph(titulo, titleFont);
+                title.Alignment = Element.ALIGN_CENTER;
+                document.Add(title);
+                document.Add(new Paragraph("\n"));
+
+                // 🔹 Crear tabla con 7 columnas
+                PdfPTable table = new PdfPTable(7);
+                table.WidthPercentage = 100;
+                float[] columnWidths = { 1f, 1.5f, 3f, 2f, 2f, 2f, 2.5f };
+                table.SetWidths(columnWidths);
+
+                // 🔹 Agregar encabezados
+                Font headerFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
+                string[] headers = { "Posición", "Número", "Nombre", "T1", "T2", "T3", "Tiempo Total" };
+
+                foreach (var header in headers)
+                {
+                    PdfPCell cell = new PdfPCell(new Phrase(header, headerFont))
+                    {
+                        BackgroundColor = BaseColor.DARK_GRAY,
+                        HorizontalAlignment = Element.ALIGN_CENTER
+                    };
+                    table.AddCell(cell);
+                }
+
+                // 🔹 Agregar datos a la tabla
+                foreach (var corredor in data.Corredores)
+                {
+                    table.AddCell(new PdfPCell(new Phrase(corredor.Posicion)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.Numero)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.Nombre)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.T1)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.T2)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.T3)));
+                    table.AddCell(new PdfPCell(new Phrase(corredor.TiempoTotal)));
+                }
+
+                document.Add(table);
+                document.Close();
+
+                byte[] fileBytes = ms.ToArray();
+                return File(fileBytes, "application/pdf", "ResultadosBusqueda.pdf");
+            }
+        }
+    
+
+    // 📌 Modelo de datos para recibir la tabla y los filtros desde el frontend
+    public class TablaResultadosModel
+    {
+        public FiltrosBusquedaModel Filtros { get; set; }
+        public List<CorredorModel> Corredores { get; set; }
+    }
+
+    public class CorredorModel
+    {
+        public string Posicion { get; set; }
+        public string Numero { get; set; }
+        public string Nombre { get; set; }
+        public string T1 { get; set; }
+        public string T2 { get; set; }
+        public string T3 { get; set; }
+        public string TiempoTotal { get; set; }
+    }
+
+    public class FiltrosBusquedaModel
+    {
+        public string NombreBuscado { get; set; }
+        public string Año { get; set; }
+        public string Edicion { get; set; }
+        public string Categoria { get; set; }
+    }
+    [HttpPost]
+        public IActionResult Logout()
+        {
+            HttpContext.Session.Clear();
+            HttpContext.Response.Cookies.Delete(".AspNetCore.Session");
+
+            return RedirectToAction("Index");
+        }
+
+>>>>>>> Stashed changes
         public IActionResult Privacy()
         {
             return View();
@@ -1846,119 +1949,34 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
             }
         }
 
-
         [HttpPost]
-        public async Task<IActionResult> Subir_ArchivoCorredor(string rutaArchivo, int carreraId, string categoriaNombre)
+        public async Task<IActionResult> Subir_ArchivoCorredor(IFormFile file)
         {
-            if (!string.IsNullOrEmpty(rutaArchivo) && System.IO.File.Exists(rutaArchivo))
+            if (file == null || file.Length == 0)
             {
-                try
-                {
-                    _logger.LogInformation($"Procesando archivo en la ruta: {rutaArchivo}");
-                    int filasProcesadas = 0;
-                    int errores = 0;
-
-                    using (var workbook = new XLWorkbook(rutaArchivo))
-                    {
-                        var worksheet = workbook.Worksheet(1);
-                        var filas = worksheet.RowsUsed();
-
-                        foreach (var fila in filas.Skip(1)) // Saltar encabezados
-                        {
-                            try
-                            {
-                                if (fila.Cells().All(cell => cell.IsEmpty()))
-                                {
-                                    _logger.LogWarning($"Fila {fila.RowNumber()} está vacía. Saltando.");
-                                    continue;
-                                }
-
-                                var nom_corredor = fila.Cell(1).GetString();
-                                var apellido_paterno = fila.Cell(2).GetString();
-                                var apellido_materno = fila.Cell(3).GetString();
-                                var fecha_cumpleanios_celda = fila.Cell(4);
-                                var sexo_corredor = fila.Cell(5).GetString().Trim();
-                                var correo_corredor = fila.Cell(6).GetString();
-                                var pais = fila.Cell(7).GetString();
-                                var telefono = fila.Cell(8).GetString();
-
-                                if (sexo_corredor != "M" && sexo_corredor != "F")
-                                {
-                                    _logger.LogError($"Error en fila {fila.RowNumber()}: Sexo '{sexo_corredor}' no válido.");
-                                    errores++;
-                                    continue;
-                                }
-
-                                if (fecha_cumpleanios_celda.TryGetValue(out DateTime fechaCumpleanios))
-                                {
-                                    // La celda ya es de tipo fecha y se puede procesar directamente
-                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
-                                        errores++;
-                                        continue;
-                                    }
-                                }
-                                else
-                                {
-                                    var fechaTexto = fecha_cumpleanios_celda.GetString().Trim();
-                                    if (!DateTime.TryParseExact(fechaTexto, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out fechaCumpleanios))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaTexto}' no válida. Asegúrese de usar el formato ISO 8601 (YYYY-MM-DD).");
-                                        errores++;
-                                        continue;
-                                    }
-
-                                    // Validar rango nuevamente
-                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
-                                        errores++;
-                                        continue;
-                                    }
-                                }
-
-                                _logger.LogInformation($"Procesando fila {fila.RowNumber()}: {nom_corredor} {apellido_paterno}.");
-                                await Crear_Corredor(
-                                    Nombre: nom_corredor,
-                                    Apaterno: apellido_paterno,
-                                    Amaterno: apellido_materno,
-                                    Fnacimiento: fechaCumpleanios,
-                                    Sexo: sexo_corredor,
-                                    Correo: correo_corredor,
-                                    Pais: pais,
-                                    Telefono: telefono,
-                                    CarreraId: carreraId,
-                                    CategoriaNombre: categoriaNombre
-                                );
-
-                                filasProcesadas++;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, $"Error procesando fila {fila.RowNumber()}: {ex.Message}");
-                                errores++;
-                                continue;
-                            }
-                        }
-                    }
-
-                    var message = errores == 0
-                        ? $"{filasProcesadas} corredores procesados exitosamente."
-                        : $"Archivo procesado con errores: {filasProcesadas} filas exitosas, {errores} errores.";
-
-                    _logger.LogInformation(message);
-                    return Json(new { success = true, message });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error al procesar el archivo: {ex.Message}");
-                    return Json(new { success = false, message = $"Error al procesar el archivo: {ex.Message}" });
-                }
+                return Json(new { success = false, message = "No se ha seleccionado un archivo válido." });
             }
 
-            _logger.LogError("La ruta del archivo no es válida o no existe.");
-            return Json(new { success = false, message = "La ruta del archivo no es válida." });
+            try
+            {
+                string uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                string filePath = Path.Combine(uploadsFolder, file.FileName);
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                return Json(new { success = true, message = "Archivo cargado correctamente.", filePath });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al cargar el archivo: {ex.Message}" });
+            }
         }
 
 

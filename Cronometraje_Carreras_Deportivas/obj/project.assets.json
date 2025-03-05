@@ -5187,11 +5187,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\escritorio\\Nueva carpeta\\06-12-2024\\Cronometraje_Carreras_Deportivas_funcional\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
+      "projectUniqueName": "U:\\dev-c\\githup\\Proyectos-Computacionales\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
       "projectName": "Cronometraje_Carreras_Deportivas",
-      "projectPath": "D:\\escritorio\\Nueva carpeta\\06-12-2024\\Cronometraje_Carreras_Deportivas_funcional\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
+      "projectPath": "U:\\dev-c\\githup\\Proyectos-Computacionales\\Cronometraje_Carreras_Deportivas\\Cronometraje_Carreras_Deportivas.csproj",
       "packagesPath": "C:\\Users\\tommy\\.nuget\\packages\\",
-      "outputPath": "D:\\escritorio\\Nueva carpeta\\06-12-2024\\Cronometraje_Carreras_Deportivas_funcional\\Cronometraje_Carreras_Deportivas\\obj\\",
+      "outputPath": "U:\\dev-c\\githup\\Proyectos-Computacionales\\Cronometraje_Carreras_Deportivas\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",

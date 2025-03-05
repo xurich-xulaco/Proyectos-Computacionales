@@ -1,0 +1,168 @@
+﻿@{
+    ViewData["Title"] = "Importar Corredores";
+}
+<nav class="navbar navbar-expand-sm header">
+    <div class="container-fluid">
+        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="" style="max-width: 15%;">
+    </div>
+</nav>
+
+<br />
+<body>
+    <div class="form-container" style="display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.05);">
+        <div class="form">
+            <form id="miFormulario" asp-action="Importar" method="post" enctype="multipart/form-data" class="container">
+                <h2>Importar Corredores desde Excel</h2>
+
+                <!-- Carga de Archivo -->
+                <div class="form-row">
+                    <div class="form-group col-md-12">
+                        <label for="fileInput">Seleccione un archivo Excel <span class="text-danger">*</span></label>
+                        <input type="file" id="fileInput" name="file" accept=".xlsx" class="form-control" required>
+                    </div>
+                </div>
+
+                <!-- Selección de Carrera -->
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="CarreraId">Seleccione una Carrera <span class="text-danger">*</span></label>
+                        <select id="CarreraId" name="CarreraId" class="form-control" required>
+                            <option value="" disabled selected>Seleccione una Carrera</option>
+                            @foreach (var carrera in ViewBag.Carreras)
+                            {
+                                <option value="@carrera.Value">@carrera.Text</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Selección de Categoría -->
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="CategoriaId">Seleccione una Categoría <span class="text-danger">*</span></label>
+                        <select id="CategoriaId" name="CategoriaNombre" class="form-control" required>
+                            <option value="" disabled selected>Seleccione una Categoría</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="form-row buttons-row">
+                    <button type="button" id="cancelar-btn" class="btn btn-cancel">Cancelar</button>
+                    <button id="btnAceptar" type="submit" class="btn btn-create" disabled>Importar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        const fileInput = document.getElementById("fileInput");
+        const btnAceptar = document.getElementById("btnAceptar");
+
+        fileInput.addEventListener("change", function () {
+            btnAceptar.disabled = !fileInput.files.length;
+        });
+
+        // Cargar categorías dinámicamente al seleccionar una carrera
+        $("#CarreraId").change(function () {
+            const carreraId = $(this).val();
+            if (carreraId) {
+                $.getJSON(`/Home/ObtenerCategoriasPorCarrera_Corredor?carreraId=${carreraId}`, function (categorias) {
+                    const categoriaSelect = $("#CategoriaId");
+                    categoriaSelect.empty().append(new Option("Seleccione una Categoría", ""));
+                    categorias.forEach(categoria => {
+                        categoriaSelect.append(new Option(categoria, categoria));
+                    });
+                }).fail(function () {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: "No se pudieron cargar las categorías. Intente nuevamente.",
+                    });
+                });
+            }
+        });
+
+        // Manejo del botón "Cancelar"
+        $("#cancelar-btn").click(function () {
+            window.location.href = "/Home/Pantalla_ini";
+        });
+    });
+</script>
+
+<style>
+    /* Estilo general */
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f7f7f7;
+    }
+
+    .form-wrapper {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-width: 800px; /* Ancho ampliado */
+        width: 100%;
+    }
+
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .form-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 10px;
+    }
+
+    input, select {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .buttons-row {
+        justify-content: center;
+    }
+
+    .btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #fff;
+        font-weight: bold;
+        text-align: center;
+        flex: 1;
+    }
+
+    .btn-cancel {
+        background-color: #e74c3c;
+    }
+
+    .btn-create {
+        background-color: #3498db;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+</style>
