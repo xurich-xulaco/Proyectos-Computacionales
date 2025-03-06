@@ -127,6 +127,19 @@
                                 <td>@corredor["T2"]</td>
                                 <td>@corredor["T3"]</td>
                                 <td>@corredor["T4"]</td>
+<<<<<<< Updated upstream
+=======
+                            <td>
+                                <button type="button" class="btn btn-danger eliminar-corredor"
+                                        data-year="@ViewBag.SelectedYear"
+                                        data-edition="@ViewBag.SelectedEdition"
+                                        data-category="@ViewBag.SelectedCategory"
+                                        data-numcorredor="@corredor["NumCorredor"]">
+                                    Eliminar
+                                </button>
+                            
+                                <button type="button" class="btn btn-warning">modificar</button></td>
+>>>>>>> Stashed changes
                             </tr>
                         }
                     </tbody>
@@ -270,6 +283,8 @@
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
 
 <script>
     async function crearCarrera() {
@@ -515,6 +530,7 @@
     });
 </script>
 
+<<<<<<< Updated upstream
 <script>
     document.getElementById("btnExportar").addEventListener("click", function () {
         let rows = document.querySelectorAll("#resultTable tbody tr");
@@ -559,6 +575,28 @@
                 a.remove();
             })
             .catch(error => console.error("Error al generar PDF:", error));
+    });
+>>>>>>> Stashed changes
+=======
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".eliminar-corredor").forEach(button => {
+            button.addEventListener("click", function () {
+                let yearCarrera = this.getAttribute("data-year");
+                let ediCarrera = this.getAttribute("data-edition");
+                let categoria = this.getAttribute("data-category");
+                let numCorredor = this.getAttribute("data-numcorredor");
+
+                if (!yearCarrera || !ediCarrera || !categoria || !numCorredor) {
+                    alert("Error: No se encontraron los datos del corredor.");
+                    return;
+                }
+
+                // Redirigir a la pantalla de eliminar con los datos en la URL
+                window.location.href = `/Home/Eliminar_Corredor?yearCarrera=${yearCarrera}&ediCarrera=${ediCarrera}&categoria=${categoria}&numCorredor=${numCorredor}`;
+            });
+        });
     });
 >>>>>>> Stashed changes
 </script>
