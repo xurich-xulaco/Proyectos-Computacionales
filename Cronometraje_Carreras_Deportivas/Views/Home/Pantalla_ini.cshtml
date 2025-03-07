@@ -141,9 +141,24 @@
                                 <td>@corredor["T2"]</td>
                                 <td>@corredor["T3"]</td>
                                 <td>@corredor["T4"]</td>
-                                <td>
-                                <button type="button" class="btn btn-danger">eliminar</button>
-                                <button type="button" class="btn btn-warning">modificar</button></td>
+                            <td>
+                                <button type="button" class="btn btn-danger eliminar-corredor"
+                                        data-year="@ViewBag.SelectedYear"
+                                        data-edition="@ViewBag.SelectedEdition"
+                                        data-category="@ViewBag.SelectedCategory"
+                                        data-numcorredor="@corredor["NumCorredor"]">
+                                    Eliminar
+                                </button>
+
+
+                                <button type="button" class="btn btn-warning modificar-corredor"
+                                        data-year="@ViewBag.SelectedYear"
+                                        data-edition="@ViewBag.SelectedEdition"
+                                        data-category="@ViewBag.SelectedCategory"
+                                        data-numcorredor="@corredor["NumCorredor"]">
+                                    Modificar
+                                </button>
+                            </td>
                             </tr>
                             
                             
@@ -448,5 +463,41 @@
         if (yearSelect.value) {
             cargarEdiciones();
         }
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".eliminar-corredor").forEach(button => {
+            button.addEventListener("click", function () {
+                let yearCarrera = this.getAttribute("data-year");
+                let ediCarrera = this.getAttribute("data-edition");
+                let categoria = this.getAttribute("data-category");
+                let numCorredor = this.getAttribute("data-numcorredor");
+
+                if (!yearCarrera || !ediCarrera || !categoria || !numCorredor) {
+                    alert("Error: No se encontraron los datos del corredor.");
+                    return;
+                }
+
+                // Redirigir a la pantalla de eliminar con los datos en la URL
+                window.location.href = `/Home/Eliminar_Corredor?yearCarrera=${yearCarrera}&ediCarrera=${ediCarrera}&categoria=${categoria}&numCorredor=${numCorredor}`;
+            });
+        });
+    });
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".modificar-corredor").forEach(button => {
+            button.addEventListener("click", function () {
+                const year = this.getAttribute("data-year");
+                const edition = this.getAttribute("data-edition");
+                const category = this.getAttribute("data-category");
+                const numCorredor = this.getAttribute("data-numcorredor");
+
+                const url = `/Home/Modificar_Corredor?year=${year}&edition=${edition}&category=${category}&numcorredor=${numCorredor}`;
+                window.location.href = url;
+            });
+        });
     });
 </script>
