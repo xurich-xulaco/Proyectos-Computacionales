@@ -11,24 +11,30 @@
         <h2 style="text-align: center; margin-bottom: 20px;">Crear Nueva Carrera</h2>
         <form id="crearCarreraForm">
             <div style="margin-bottom: 15px;">
-                <label for="nombreCarrera">Nombre de la Carrera</label>
+                <label for="nombreCarrera">Nombre de la Carrera <span class="text-danger">*</span></label>
                 <input type="text" id="nombreCarrera" name="nombreCarrera" class="form-control" required />
             </div>
             <div style="margin-bottom: 15px;">
-                <label for="yearCarrera">Año</label>
+                <label for="yearCarrera">Año <span class="text-danger">*</span></label>
                 <input type="number" id="yearCarrera" name="yearCarrera" class="form-control" required min="2000" max="2100" />
             </div>
             <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 15px;">
                 @for (int i = 0; i < 3; i++)
                 {
-                    int index = i + 1;
-                    <select name="categoriasSeleccionadas" class="form-control" style="flex: 1;" required>
-                        <option value="">categoria @index</option>
+                                        int index = i + 1;
+                    <div style="text-align:center">
+                        <label>Categoria @index  <span class="text-danger">*</span></label>
+                    <select name="categoriasSeleccionadas" class="form-control"  required>
+                        <option value="">Selecciona</option>
                         @foreach (var categoria in ViewBag.Categorias as List<SelectListItem>)
                         {
+                            <label>categoria</label>
+                            <br />
+
                             <option value="@categoria.Value">@categoria.Text</option>
                         }
                     </select>
+                        </div>
                 }
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 20px;">
