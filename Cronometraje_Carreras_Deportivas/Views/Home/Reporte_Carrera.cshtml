@@ -39,7 +39,7 @@
                 <dl class="row">
 
                     <dt class="col-sm-4">
-                        <h5>Mixta 10km:</h5>
+                        <h5 id="tituloMixta2">Mixta XXkm:</h5>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="PrimerPodioMixto">
                             <label class="form-check-label" for="PrimerPodioMixto">
@@ -73,7 +73,7 @@
                     </dt>
 
                     <dt class="col-sm-4">
-                        <h5>Mujeres 10km:</h5>
+                        <h5 id="tituloMujeres2">Mujeres XXkm:</h5>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="PrimerPodioMuj">
                             <label class="form-check-label" for="PrimerPodioMuj">
@@ -95,7 +95,8 @@
                     </dt>
 
                     <dt class="col-sm-4">
-                        <h5>Hombres 10km:</h5>
+                        <h5 id="tituloHombres2">Hombres XXkm:</h5>
+
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="PrimerPodioHom">
                             <label class="form-check-label" for="PrimerPodioHom">
@@ -117,7 +118,7 @@
                     </dt>
 
                     <dt class="col-sm-4">
-                        <h5>Mixta 21km:</h5>
+                        <h5 id="tituloMixta1">Mixta XXkm:</h5>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="SegundoPodioMixto">
                             <label class="form-check-label" for="SegundoPodioMixto">
@@ -151,7 +152,7 @@
                     </dt>
 
                     <dt class="col-sm-4">
-                        <h5>Mujeres 21km:</h5>
+                        <h5 id="tituloMujeres1">Mujeres XXkm:</h5>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="SegundoPodioMuj">
                             <label class="form-check-label" for="SegundoPodioMuj">
@@ -173,7 +174,7 @@
                     </dt>
 
                     <dt class="col-sm-4">
-                        <h5>Hombres 21km:</h5>
+                        <h5 id="tituloHombres1">Hombres XXkm:</h5>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value=true id="SegundoPodioHom">
                             <label class="form-check-label" for="SegundoPodioHom">
@@ -291,4 +292,117 @@
             });
         });
     });
+</script>
+<script>
+    $(document).ready(function () {
+        // Cuando el usuario cambia la carrera seleccionada
+        $("#CarreraId").change(function () {
+            const carreraId = $(this).val();
+
+            if (carreraId) {
+                // Hacer una petición AJAX para obtener las categorías de la carrera seleccionada
+                $.getJSON(`/Home/ObtenerCategoriasPorCarrera_Reporte?carreraId=${carreraId}`, function (categorias) {
+                    if (categorias && categorias.length === 2) {
+                        // Actualizar los valores de los inputs ocultos
+                        $("#Categoria1").val(categorias[0]);
+                        $("#Categoria2").val(categorias[1]);
+
+                        // Actualizar los títulos dinámicamente
+                        actualizarTitulosCategorias(categorias[0], categorias[1]);
+                    } else {
+                        // Si no se obtienen datos, asignar valores por defecto
+                        actualizarTitulosCategorias("XXkm", "XXkm");
+                    }
+                }).fail(function () {
+                    // En caso de error, asignar valores por defecto
+                    actualizarTitulosCategorias("XXkm", "XXkm");
+                });
+            } else {
+                // Si no se ha seleccionado ninguna carrera, restablecer a valores por defecto
+                actualizarTitulosCategorias("XXkm", "XXkm");
+            }
+        });
+
+        // Función para actualizar los títulos de las categorías
+        function actualizarTitulosCategorias(categoria1, categoria2) {
+            $("#Categoria1").val(categoria1);
+            $("#Categoria2").val(categoria2);
+
+            // Actualizar títulos de la primera categoría
+            $("#tituloMixta1").text("Mixta " + categoria1);
+            $("#tituloMujeres1").text("Mujeres " + categoria1);
+            $("#tituloHombres1").text("Hombres " + categoria1);
+
+            // Actualizar títulos de la segunda categoría
+            $("#tituloMixta2").text("Mixta " + categoria2);
+            $("#tituloMujeres2").text("Mujeres " + categoria2);
+            $("#tituloHombres2").text("Hombres " + categoria2);
+        }
+
+        // Manejo del botón "Cancelar"
+        $("#cancelar-btn").click(function () {
+            window.location.href = "/Home/Pantalla_ini";
+        });
+
+        // Manejo del botón "Generar Reporte"
+        $("#generar-btn").click(function () {
+            const carreraId = $("#CarreraId").val();
+
+            if (!carreraId) {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Por favor, selecciona una carrera.",
+                });
+                return;
+            }
+
+            // Obtener la lista de booleanos de las opciones seleccionadas
+            var [lista1, lista2] = obtenerListaDeBooleanos();
+
+            // Enviar datos al servidor para generar el reporte
+            $.post("/Home/GenerarReporteCarrera", { carreraId, lista1, lista2 }, function (response) {
+                if (response.success) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Éxito",
+                        text: "El reporte se generó correctamente.",
+                    }).then(() => {
+                        window.open(response.downloadUrl, '_blank');
+                        window.location.href = "/Home/Pantalla_ini";
+                    });
+                } else {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: response.message,
+                    });
+                }
+            }).fail(function () {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Ocurrió un error inesperado.",
+                });
+            });
+        });
+
+        // Función para obtener la lista de booleanos según los checkboxes seleccionados
+        function obtenerListaDeBooleanos() {
+            var ListaBooleana1 = [
+                $('#PrimerPodioMixto').prop('checked'), $('#PrimeroMenorTMixto').prop('checked'), $('#PrimerPromTMixto').prop('checked'), $('#PrimerNumHom').prop('checked'), $('#PrimerNumMuj').prop('checked'),
+                $('#PrimerPodioMuj').prop('checked'), $('#PrimerMenorTMuj').prop('checked'), $('#PrimerPromTMuj').prop('checked'),
+                $('#PrimerPodioHom').prop('checked'), $('#PrimerMenorTHom').prop('checked'), $('#PrimerPromTHom').prop('checked')
+            ];
+
+            var ListaBooleana2 = [
+                $('#SegundoPodioMixto').prop('checked'), $('#SegundoMenorTMixto').prop('checked'), $('#SegundoPromTMixto').prop('checked'), $('#SegundoNumHom').prop('checked'), $('#SegundoNumMuj').prop('checked'),
+                $('#SegundoPodioMuj').prop('checked'), $('#SegundoMenorTMuj').prop('checked'), $('#SegundoPromTMuj').prop('checked'),
+                $('#SegundoPodioHom').prop('checked'), $('#SegundoMenorTHom').prop('checked'), $('#SegundoPromTHom').prop('checked')
+            ];
+
+            return [ListaBooleana1, ListaBooleana2];
+        }
+    });
+
 </script>
