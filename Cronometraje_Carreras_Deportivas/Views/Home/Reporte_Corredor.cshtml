@@ -137,14 +137,6 @@
                 </div>
             </div>
 
-            <!-- Ruta del archivo -->
-            <div class="form-row">
-                <div>
-                    <label for="rutaArchivo">Ruta del archivo .txt:</label>
-                    <input type="text" id="rutaArchivo" name="rutaArchivo" placeholder="C:\ruta\del\archivo.pdf" />
-                </div>
-            </div>
-
             <!-- Botones principales -->
             <div class="form-row">
                 <button type="button" id="buscar">Buscar</button>
@@ -275,21 +267,32 @@
 
             // Generar reporte
             $('#generarReporte').click(function () {
-                const rutaArchivo = $('#rutaArchivo').val();
                 const year = $('#year').val();
                 const edicion = $('#edicion').val();
                 const categoria = $('#categoria').val();
                 const numero = $('#numero').val();
 
-                if (!rutaArchivo || !year || !edicion || !categoria) {
-                    Swal.fire('Error', 'Por favor, completa todos los campos, incluida la ruta del archivo.', 'error');
+                if (!year || !edicion || !categoria || !numero) {
+                    Swal.fire('Error', 'Por favor, completa todos los campos requeridos.', 'error');
                     return;
                 }
 
-                $.post('/Home/GenerarReporteCorredor', { year, edicion, categoria, numero, rutaArchivo })
+                $.post('/Home/GenerarReporteCorredor', { year, edicion, categoria, numero })
                     .done(function (data) {
                         if (data.success) {
-                            Swal.fire('¡Reporte generado!', 'El reporte se ha generado exitosamente.', 'success');
+                            var downloadWindow = window.open(data.downloadUrl, '_blank');
+                            Swal.fire({
+                                title: '¡Reporte generado!',
+                                text: 'Se está descargando el reporte. Por favor, espera unos segundos.',
+                                icon: 'success',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                            setTimeout(function () {
+                                if (downloadWindow && !downloadWindow.closed) {
+                                    downloadWindow.close();
+                                }
+                            }, 3000);
                         } else {
                             Swal.fire('Error', data.message, 'error');
                         }
