@@ -2257,13 +2257,13 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                     int minKm = categoriasKm.Min(x => x.Km);
                     var categoriasFiltradas = categoriasKm.Where(x => x.Km != minKm).ToList();
 
-                    // Si hay más de dos, se toman las dos de mayor kilometraje
+                    // Ordenar siempre de forma descendente por el número de km
+                    categoriasFiltradas = categoriasFiltradas.OrderByDescending(x => x.Km).ToList();
+
+                    // Si hay más de dos, se toman las dos de mayor kilometraje (ya ordenadas)
                     if (categoriasFiltradas.Count > 2)
                     {
-                        categoriasFiltradas = categoriasFiltradas
-                            .OrderByDescending(x => x.Km)
-                            .Take(2)
-                            .ToList();
+                        categoriasFiltradas = categoriasFiltradas.Take(2).ToList();
                     }
 
                     categorias = categoriasFiltradas.Select(x => x.Nombre).ToList();

@@ -101,7 +101,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     fs.Read(fileBytes, 0, fileBytes.Length);
                 }
                 // Opcional: si el crash ocurre al eliminar, comenta la siguiente línea
-                // System.IO.File.Delete(filePath);
+                System.IO.File.Delete(filePath);
                 return File(fileBytes, "application/pdf", "ReporteCarrera.pdf");
             }
             catch (Exception ex)
@@ -251,42 +251,43 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             ReporteCorredor_CarCatInfo carreraInfo = default;
 
             string queryTiempos = @"
-    WITH TiemposCorredor AS (
-        SELECT 
-            folio_chip,
-            tiempo_registrado,
-            ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-        FROM dbo.TIEMPO
-    )
+WITH TiemposCorredor AS (
     SELECT 
-        ca.nom_carrera,
-        ca.year_carrera,
-        ca.edi_carrera,
-        (SELECT nombre_categoria FROM CATEGORIA WHERE ID_categoria = cc.ID_categoria) AS Categoria,
-        RANK() OVER (ORDER BY 
-            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))
-        ) AS Posicion,
-        COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
-        COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
-        COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-        CONVERT(TIME, DATEADD(SECOND, 
-            DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
-            0
-        )) AS TiempoTotal
-    FROM CARRERA ca
-    JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-    JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
-    WHERE 
-        ca.ID_carrera = @idCarrera
-        AND cc.ID_categoria = @idCategoria
-        AND v.num_corredor = @numCorredor;";
+        folio_chip,
+        tiempo_registrado,
+        ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+    FROM dbo.TIEMPO
+)
+SELECT 
+    ca.nom_carrera,
+    ca.year_carrera,
+    ca.edi_carrera,
+    (SELECT nombre_categoria FROM CATEGORIA WHERE ID_categoria = cc.ID_categoria) AS Categoria,
+    RANK() OVER (ORDER BY 
+        (DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+         DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+         DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))),
+        v.num_corredor
+    ) AS Posicion,
+    COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+    COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+    COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+    CONVERT(TIME, DATEADD(SECOND, 
+        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
+        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
+        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+        0
+    )) AS TiempoTotal
+FROM CARRERA ca
+JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
+LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+WHERE 
+    ca.ID_carrera = @idCarrera
+    AND cc.ID_categoria = @idCategoria
+    AND v.num_corredor = @numCorredor;";
 
             using (SqlCommand command = new SqlCommand(queryTiempos, connection))
             {
@@ -686,9 +687,10 @@ WITH TiemposCorredor AS (
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            v.num_corredor
         ) AS Posicion,
         v.num_corredor,
         c.nom_corredor,
@@ -698,9 +700,9 @@ Posiciones AS (
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
         CONVERT(TIME, DATEADD(SECOND, 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -735,9 +737,10 @@ WITH TiemposCorredor AS (
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            v.num_corredor
         ) AS Posicion,
         v.num_corredor,
         c.nom_corredor,
@@ -747,9 +750,9 @@ Posiciones AS (
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
         CONVERT(TIME, DATEADD(SECOND, 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -763,8 +766,13 @@ Posiciones AS (
       AND c.sex_corredor = 'F'
 )
 SELECT TOP 3 
-    Posicion, num_corredor, nom_corredor, apP_corredor, apM_corredor, 
-    T1, T2, T3, TiempoTotal
+    Posicion, 
+    num_corredor, 
+    nom_corredor, 
+    apP_corredor, 
+    apM_corredor, 
+    T1, T2, T3, 
+    TiempoTotal
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
@@ -780,9 +788,10 @@ WITH TiemposCorredor AS (
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            v.num_corredor
         ) AS Posicion,
         v.num_corredor,
         c.nom_corredor,
@@ -792,9 +801,9 @@ Posiciones AS (
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
         CONVERT(TIME, DATEADD(SECOND, 
-            DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-            DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')), 0)) AS TiempoTotal
+            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
+             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -808,16 +817,22 @@ Posiciones AS (
       AND c.sex_corredor = 'M'
 )
 SELECT TOP 3 
-    Posicion, num_corredor, nom_corredor, apP_corredor, apM_corredor, 
-    T1, T2, T3, TiempoTotal
+    Posicion, 
+    num_corredor, 
+    nom_corredor, 
+    apP_corredor, 
+    apM_corredor, 
+    T1, T2, T3, 
+    TiempoTotal
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
                 default:
                     PodioQuery = string.Empty;
-                    _logger.LogWarning("No se eleigió un podio valido para consultas en el reporte de la carrera.");
+                    _logger.LogWarning("No se eligió un podio válido para consultas en el reporte de la carrera.");
                     return ListaPodio;
             }
+
             using (SqlCommand podioCmd = new SqlCommand(PodioQuery, connection))
             {
                 podioCmd.Parameters.AddWithValue("@carreraId", IDcarrera);
@@ -826,9 +841,8 @@ ORDER BY Posicion;";
                 {
                     while (await reader.ReadAsync())
                     {
-                        // Se arma el nombre completo concatenando los tres fragmentos
+                        // Concatenar el nombre completo a partir de los fragmentos
                         string nombreCompleto = $"{reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}";
-
                         var reporte = new ReporteCarreras_Podio(
                             NPosicion: reader["Posicion"].ToString(),
                             NumeroCorredor: reader["num_corredor"].ToString(),
@@ -1155,6 +1169,7 @@ FROM TotalTiempos;";
                     }
 
                     short cat_cont = 0;
+                    bool existeAlgunCorredor = false;
 
                     foreach (var categoria in categorias)
                     {
@@ -1174,8 +1189,14 @@ FROM TotalTiempos;";
                         int participantes = await ReporteCarreras_VerificarParticipantes(carreraId, categoria, connection);
                         if (participantes == 0)
                         {
+                            numeroCorredores.Enqueue(-1); // Marcar que no hay hombres
+                            numeroCorredores.Enqueue(-1); // Marcar que no hay mujeres
                             cat_cont++;
                             continue;
+                        }
+                        else
+                        {
+                            existeAlgunCorredor = true;
                         }
 
                         // Obtener totales de participantes por género para la categoría actual
@@ -1232,6 +1253,14 @@ FROM TotalTiempos;";
                         {
                             ListaDeTiempoPromedio.Enqueue(await ReporteCarreras_ObtenerTiempoPromedio(carreraId, categoria, 2, connection));
                         }
+                        cat_cont++;
+                    }
+
+                    // Antes de iniciar la generación del PDF, verificamos si se encontró algún corredor
+                    if (!existeAlgunCorredor)
+                    {
+                        _logger.LogError("No hay corredores en la carrera seleccionada.");
+                        return Json(new { success = false, message = "No hay ningún corredor en la carrera." });
                     }
                 }
             }
@@ -1278,15 +1307,16 @@ FROM TotalTiempos;";
                     };
                     pdfDoc.Add(carreraDatos);
 
-                    // Función local para imprimir la tabla de podio con estilo moderno
-                    void AgregarTablaPodio(int cantidad = 3)
+                    // Función para agregar la tabla del podio para una sección
+                    void AgregarPodioPorSeccion(Queue<ReporteCarreras_Podio> listaPodios, int totalParticipantes)
                     {
-                        if (ListaPodios.Count == 0)
+                        if (totalParticipantes <= 0)
                         {
-                            pdfDoc.Add(new Paragraph("No hay participantes para este podio.", normalFont));
+                            pdfDoc.Add(new Paragraph("Sin participantes en esta sección.", normalFont));
                             return;
                         }
 
+                        int podioMax = Math.Min(3, totalParticipantes);
                         PdfPTable tabla = new PdfPTable(7)
                         {
                             WidthPercentage = 100,
@@ -1294,7 +1324,7 @@ FROM TotalTiempos;";
                             SpacingAfter = 10
                         };
 
-                        // Encabezados de la tabla con fondo gris claro y padding consistente
+                        // Encabezados de la tabla
                         string[] headers = { "Posición", "Número", "Nombre", "Tiempo 1", "Tiempo 2", "Tiempo 3", "Tiempo Total" };
                         foreach (string header in headers)
                         {
@@ -1308,10 +1338,10 @@ FROM TotalTiempos;";
                             tabla.AddCell(cell);
                         }
 
-                        // Agregar filas de datos
-                        for (int i = 0; i < cantidad && ListaPodios.Count > 0; i++)
+                        // Ciclo para extraer datos del podio (máximo 3 o según total participantes)
+                        for (int i = 0; i < podioMax && listaPodios.Count > 0; i++)
                         {
-                            ReporteCarreras_Podio podio = ListaPodios.Dequeue();
+                            ReporteCarreras_Podio podio = listaPodios.Dequeue();
                             tabla.AddCell(new PdfPCell(new Phrase(podio.posicion, normalFont)) { Padding = 5, BorderWidth = 0.5f });
                             tabla.AddCell(new PdfPCell(new Phrase(podio.numero, normalFont)) { Padding = 5, BorderWidth = 0.5f });
                             tabla.AddCell(new PdfPCell(new Phrase(podio.nombre, normalFont)) { Padding = 5, BorderWidth = 0.5f });
@@ -1323,7 +1353,7 @@ FROM TotalTiempos;";
                         pdfDoc.Add(tabla);
                     }
 
-                    // Función local para imprimir párrafos de tiempo con espaciado adecuado
+                    // Función para agregar un párrafo con el tiempo (mínimo o promedio)
                     void AgregarParrafoTiempo(string titulo, Queue<string> colaTiempos)
                     {
                         Paragraph pTitulo = new Paragraph(titulo, normalFont)
@@ -1345,7 +1375,8 @@ FROM TotalTiempos;";
                         }
                     }
 
-                    // Procesar cada categoría
+                    // Procesar cada categoría. Se asume que 'categorias' y 'listas' ya están definidos y llenos.
+                    // 'listas' contiene los dos arreglos booleanos (lista1 y lista2) correspondientes a cada categoría.
                     List<bool[]> listas = new List<bool[]> { lista1, lista2 };
                     for (int i = 0; i < categorias.Count && i < listas.Count; i++)
                     {
@@ -1361,27 +1392,25 @@ FROM TotalTiempos;";
                         };
                         pdfDoc.Add(catTitle);
 
-                        // Extraer participantes para la categoría
+                        // Extraer el total de participantes para hombres y mujeres de la cola
                         int participantesHombres = numeroCorredores.Dequeue();
                         int participantesMujeres = numeroCorredores.Dequeue();
 
-                        if (participantesHombres <= 0 && participantesMujeres <= 0)
-                        {
-                            pdfDoc.Add(new Paragraph("Sin participantes en esta categoría.", normalFont));
-                            pdfDoc.Add(new Paragraph(new string('-', 66), normalFont));
-                            continue;
-                        }
+                        // Si el valor es -1, lo consideramos como 0
+                        participantesHombres = (participantesHombres < 0) ? 0 : participantesHombres;
+                        participantesMujeres = (participantesMujeres < 0) ? 0 : participantesMujeres;
 
-                        // Sección Mixta
+                        // Sección Mixta (suma de ambos)
                         Paragraph seccionMixta = new Paragraph("Sección Mixta", sectionFont)
                         {
                             SpacingBefore = 10,
                             SpacingAfter = 5
                         };
                         pdfDoc.Add(seccionMixta);
+                        int totalMixto = participantesHombres + participantesMujeres;
                         if (orden[0])
                         {
-                            AgregarTablaPodio(3);
+                            AgregarPodioPorSeccion(ListaPodios, totalMixto);
                             pdfDoc.Add(new Paragraph(" "));
                         }
                         if (orden[1])
@@ -1411,7 +1440,7 @@ FROM TotalTiempos;";
                             pdfDoc.Add(new Paragraph($"Número de participantes en Mujeres: {participantesMujeres}", normalFont));
                             if (orden[5])
                             {
-                                AgregarTablaPodio(3);
+                                AgregarPodioPorSeccion(ListaPodios, participantesMujeres);
                                 pdfDoc.Add(new Paragraph(" "));
                             }
                             if (orden[6])
@@ -1442,7 +1471,7 @@ FROM TotalTiempos;";
                             pdfDoc.Add(new Paragraph($"Número de participantes en Hombres: {participantesHombres}", normalFont));
                             if (orden[8])
                             {
-                                AgregarTablaPodio(3);
+                                AgregarPodioPorSeccion(ListaPodios, participantesHombres);
                                 pdfDoc.Add(new Paragraph(" "));
                             }
                             if (orden[9])
