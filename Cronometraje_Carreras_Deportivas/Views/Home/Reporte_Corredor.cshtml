@@ -277,27 +277,35 @@
                     return;
                 }
 
+                // Mostrar pantalla de carga durante la generación del PDF
+                Swal.fire({
+                    title: 'Generando reporte...',
+                    text: 'Por favor, espera mientras se procesa la información.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
                 $.post('/Home/GenerarReporteCorredor', { year, edicion, categoria, numero })
                     .done(function (data) {
+                        Swal.close();
                         if (data.success) {
-                            var downloadWindow = window.open(data.downloadUrl, '_blank');
                             Swal.fire({
-                                title: '¡Reporte generado!',
-                                text: 'Se está descargando el reporte. Por favor, espera unos segundos.',
                                 icon: 'success',
-                                timer: 3000,
-                                showConfirmButton: false
+                                title: '¡Reporte generado!',
+                                text: 'El reporte se generó correctamente.',
+                                showConfirmButton: true
+                            }).then(() => {
+                                window.open(data.downloadUrl, '_blank');
+                                window.location.href = '/Home/Pantalla_ini';
                             });
-                            setTimeout(function () {
-                                if (downloadWindow && !downloadWindow.closed) {
-                                    downloadWindow.close();
-                                }
-                            }, 3000);
                         } else {
                             Swal.fire('Error', data.message, 'error');
                         }
                     })
                     .fail(function () {
+                        Swal.close();
                         Swal.fire('Error', 'No se pudo generar el reporte. Verifica tu conexión.', 'error');
                     });
             });

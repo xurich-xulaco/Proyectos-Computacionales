@@ -88,20 +88,39 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         {
             try
             {
-                string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCarrera");
+                // Validar que se reciba un nombre de archivo
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    _logger.LogError("Se ha recibido un nombre de archivo vacío o nulo.");
+                    return BadRequest("El nombre de archivo es requerido.");
+                }
+
+                _logger.LogInformation("Generando link de descarga.");
+
+                string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
                 string filePath = Path.Combine(tempFolder, fileName);
+
                 if (!System.IO.File.Exists(filePath))
                 {
-                    return Content("El archivo no existe o ya fue descargado.");
+                    _logger.LogError("El archivo no existe o ya fue descargado.");
+                    return NotFound("El archivo no existe o ya fue descargado.");
                 }
-                byte[] fileBytes;
-                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-                {
-                    fileBytes = new byte[fs.Length];
-                    fs.Read(fileBytes, 0, fileBytes.Length);
-                }
+
+                byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+
                 // Opcional: si el crash ocurre al eliminar, comenta la siguiente línea
-                System.IO.File.Delete(filePath);
+                try
+                {
+                    System.IO.File.Delete(filePath);
+                    _logger.LogInformation("Archivo eliminado después de la descarga.");
+                }
+                catch (Exception exDelete)
+                {
+                    _logger.LogError($"Error al eliminar el archivo: {exDelete}");
+                    // Se puede continuar aunque falle la eliminación, ya que es opcional.
+                }
+
+                _logger.LogInformation("Link de descarga completamente generado.");
                 return File(fileBytes, "application/pdf", "ReporteCarrera.pdf");
             }
             catch (Exception ex)
@@ -349,6 +368,8 @@ WHERE
                 {
                     await connection.OpenAsync();
 
+                    _logger.LogInformation("Abriendo conexión con la base de datos para generar un reporte de corredor.");
+
                     // 2. Obtener ID del corredor
                     idCorredor = await ReporteCorredor_CorredorID(year, edicion, categoria, numero, connection);
                     if (idCorredor.IsNullOrEmpty())
@@ -368,6 +389,8 @@ WHERE
 
                     if (carrerasInfo.Count == 0)
                         _logger.LogWarning("El contenido del reporte está vacío.");
+
+                    _logger.LogInformation("Cerrando conexión con la base de datos.");
                 }
             }
             catch (Exception ex_sql)
@@ -383,6 +406,8 @@ WHERE
             {
                 using (var ms = new MemoryStream())
                 {
+                    _logger.LogInformation("Generando reporte de corredor en PDF.");
+
                     // Crear documento en tamaño carta, con márgenes de 50 unidades
                     Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
                     PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
@@ -477,8 +502,10 @@ WHERE
 
                     pdfDoc.Close();
 
+                    _logger.LogInformation("Reporte generado completamente.");
+
                     // Guardar el PDF en una carpeta temporal y generar URL de descarga
-                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCarrera");
+                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
                     if (!Directory.Exists(tempFolder))
                         Directory.CreateDirectory(tempFolder);
                     string fileName = $"ReporteCorredor_{Guid.NewGuid()}.pdf";
@@ -490,7 +517,7 @@ WHERE
             }
             catch (Exception ex_pdf)
             {
-                _logger.LogInformation(ex_pdf, "Error en la generación del PDF");
+                _logger.LogError(ex_pdf, "Error en la generación del PDF");
                 return Json(new { success = false, message = "Hubo un error generando el PDF." });
             }
         }
@@ -1141,6 +1168,8 @@ FROM TotalTiempos;";
                 {
                     await connection.OpenAsync();
 
+                    _logger.LogInformation("Abriendo conexión con la base de datos para reporte de carrera.");
+
                     // 1. Obtener datos básicos de la carrera
                     carreraInfo = await ReporteCarreras_GetInfo(carreraId, connection);
 
@@ -1262,6 +1291,8 @@ FROM TotalTiempos;";
                         _logger.LogError("No hay corredores en la carrera seleccionada.");
                         return Json(new { success = false, message = "No hay ningún corredor en la carrera." });
                     }
+
+                    _logger.LogInformation("Cerrando conexión con la base de datos.");
                 }
             }
             catch (Exception ex_sql)
@@ -1274,6 +1305,8 @@ FROM TotalTiempos;";
             {
                 using (var ms = new MemoryStream())
                 {
+                    _logger.LogInformation("Generando reporte de carrera en PDF.");
+
                     // Crear el documento en tamaño carta con márgenes de 50 unidades
                     Document pdfDoc = new Document(PageSize.LETTER, 50, 50, 50, 50);
                     PdfWriter writer = PdfWriter.GetInstance(pdfDoc, ms);
@@ -1492,8 +1525,10 @@ FROM TotalTiempos;";
 
                     pdfDoc.Close();
 
+                    _logger.LogInformation("Reporte generado completamente.");
+
                     // Guardar el PDF en una carpeta temporal
-                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCarrera");
+                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
                     if (!Directory.Exists(tempFolder))
                         Directory.CreateDirectory(tempFolder);
                     string fileName = $"ReporteCarrera_{Guid.NewGuid()}.pdf";
@@ -1507,7 +1542,7 @@ FROM TotalTiempos;";
             }
             catch (Exception ex_pdf)
             {
-                _logger.LogInformation(ex_pdf, "Hubo un error inesperado en la generación del PDF");
+                _logger.LogError(ex_pdf, "Hubo un error inesperado en la generación del PDF");
                 return Json(new { success = false, message = "Hubo un error generando el PDF." });
             }
         }

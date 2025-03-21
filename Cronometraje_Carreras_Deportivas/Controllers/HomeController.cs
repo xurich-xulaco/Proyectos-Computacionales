@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading.Tasks;
@@ -407,12 +407,16 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             {
                 await connection.OpenAsync();
                 string sql = @"
-            SELECT DISTINCT cat.nombre_categoria
-            FROM CATEGORIA cat
-            INNER JOIN CARR_Cat cc ON cat.ID_categoria = cc.ID_categoria
-            INNER JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
-            WHERE ca.year_carrera = @YearCarrera AND ca.edi_carrera = @EdiCarrera
-            ORDER BY cat.nombre_categoria";
+            SELECT nombre_categoria
+            FROM (
+                SELECT DISTINCT cat.nombre_categoria,
+                    CAST(LEFT(cat.nombre_categoria, CHARINDEX(' ', cat.nombre_categoria) - 1) AS int) AS km
+                FROM CATEGORIA cat
+                INNER JOIN CARR_Cat cc ON cat.ID_categoria = cc.ID_categoria
+                INNER JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                WHERE ca.year_carrera = @YearCarrera AND ca.edi_carrera = @EdiCarrera
+            ) AS T
+            ORDER BY km";
 
                 using (SqlCommand command = new SqlCommand(sql, connection))
                 {
@@ -2178,14 +2182,22 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                     await connection.OpenAsync();
                     string query = @"
                 SELECT 
-    ca.ID_carrera,
-    CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', 
-           '(', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
-FROM CARRERA ca
-JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
-JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
-ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
+                    ca.ID_carrera,
+                    CONCAT(
+                        ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')',
+                        '(', 
+                        STRING_AGG(
+                            cat.nombre_categoria, ', '
+                        ) WITHIN GROUP (
+                            ORDER BY CAST(LEFT(cat.nombre_categoria, CHARINDEX(' ' , cat.nombre_categoria) - 1) AS int)
+                        ), 
+                        ')'
+                    ) AS Carrera
+                FROM CARRERA ca
+                JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
+                ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     using (SqlDataReader reader = await command.ExecuteReaderAsync())
@@ -2216,64 +2228,40 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
         {
             try
             {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                var categorias = new List<string>();
+                // Reutilizamos la función ya existente para obtener la lista base de categorías
+                var categorias = await ObtenerCategoriasPorCarrera(carreraId);
 
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    await connection.OpenAsync();
-                    string query = @"
-                SELECT cat.nombre_categoria
-                FROM CATEGORIA cat
-                JOIN CARR_CAT cc ON cat.ID_categoria = cc.ID_categoria
-                WHERE cc.ID_carrera = @carreraId";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@carreraId", carreraId);
-
-                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                categorias.Add(reader["nombre_categoria"].ToString());
-                            }
-                        }
-                    }
-                }
-
-                // Si se encontraron categorías, aplicar el filtrado
                 if (categorias.Count > 0)
                 {
-                    // Convertir cada categoría a un objeto con su valor numérico (se espera formato "N km")
+                    // Convertir cada categoría a un objeto anónimo que incluye el valor numérico extraído in-line
                     var categoriasKm = categorias.Select(c =>
                     {
-                        string[] parts = c.Split(' ');
-                        int km = int.TryParse(parts[0], out int valor) ? valor : 0;
+                        // Se asume el formato "X km", se divide la cadena y se intenta convertir la primera parte a entero
+                        var parts = c.Split(' ');
+                        int km = (parts.Length > 0 && int.TryParse(parts[0], out int valor)) ? valor : 0;
                         return new { Nombre = c, Km = km };
                     }).ToList();
 
-                    // Descartar la categoría con el menor kilometraje
+                    // Descartar la(s) categoría(s) con el valor mínimo
                     int minKm = categoriasKm.Min(x => x.Km);
-                    var categoriasFiltradas = categoriasKm.Where(x => x.Km != minKm).ToList();
+                    var filtradas = categoriasKm.Where(x => x.Km != minKm).ToList();
 
-                    // Ordenar siempre de forma descendente por el número de km
-                    categoriasFiltradas = categoriasFiltradas.OrderByDescending(x => x.Km).ToList();
+                    // Ordenar de forma descendente por el valor numérico
+                    var ordenadasDesc = filtradas.OrderByDescending(x => x.Km).ToList();
 
-                    // Si hay más de dos, se toman las dos de mayor kilometraje (ya ordenadas)
-                    if (categoriasFiltradas.Count > 2)
+                    // Si hay más de dos categorías, tomamos únicamente las dos de mayor valor
+                    if (ordenadasDesc.Count > 2)
                     {
-                        categoriasFiltradas = categoriasFiltradas.Take(2).ToList();
+                        ordenadasDesc = ordenadasDesc.Take(2).ToList();
                     }
-
-                    categorias = categoriasFiltradas.Select(x => x.Nombre).ToList();
+                    categorias = ordenadasDesc.Select(x => x.Nombre).ToList();
                 }
 
                 return Json(categorias);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al cargar categorías: {ex.Message}");
+                _logger.LogError($"Error al obtener categorías para reporte: {ex.Message}");
                 return Json(new { error = "Ocurrió un error al cargar las categorías." });
             }
         }
