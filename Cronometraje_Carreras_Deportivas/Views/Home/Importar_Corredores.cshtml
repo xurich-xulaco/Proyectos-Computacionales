@@ -105,13 +105,21 @@
 
             $.post("/Home/Subir_ArchivoCorredor", { rutaArchivo, carreraId, categoriaNombre }, function (response) {
                 if (response.success) {
-                    Swal.fire({
-                        icon: "success",
-                        title: "Éxito",
-                        text: response.message,
-                    }).then(() => {
-                        window.location.href = "/Home/Pantalla_ini";
-                    });
+                    if(response.errorCount > 0) {
+                        Swal.fire({
+                            icon: "warning",
+                            title: "Atención",
+                            text: response.message,
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: "success",
+                            title: "Éxito",
+                            text: response.message,
+                        }).then(() => {
+                            window.location.href = "/Home/Pantalla_ini";
+                        });
+                    }
                 } else {
                     Swal.fire({
                         icon: "error",

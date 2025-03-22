@@ -567,6 +567,11 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
+                    // Preparar el valor del correo: si es nulo, vacío o no contiene '@', se usa DBNull.
+                    object correoParametro = string.IsNullOrWhiteSpace(Correo) || !Correo.Contains("@")
+                        ? (object)DBNull.Value
+                        : Correo;
+
                     // Intentar insertar el corredor (si ya existe, se lanzará una excepción)
                     byte[]? corredorId = null;
                     try
@@ -584,7 +589,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                             insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
                             insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
                             insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
-                            insertCommand.Parameters.AddWithValue("@Correo", (object?)Correo ?? DBNull.Value);
+                            insertCommand.Parameters.AddWithValue("@Correo", correoParametro);
                             insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
 
                             corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
@@ -647,7 +652,24 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     if (!idCarrCat.HasValue)
                         return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
 
-                    // Verificar si el corredor ya está vinculado a esta Carrera-Categoría
+                    // VALIDACIÓN: Evitar que el corredor se inscriba en más de una categoría en la misma carrera.
+                    string checkMultiCatSql = @"
+                SELECT COUNT(*) 
+                FROM Vincula_participante vp
+                INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                WHERE vp.ID_corredor = @IDCorredor AND cc.ID_carrera = @CarreraId";
+
+                    using (SqlCommand checkMultiCatCommand = new SqlCommand(checkMultiCatSql, connection))
+                    {
+                        checkMultiCatCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+                        checkMultiCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
+                        if ((int)await checkMultiCatCommand.ExecuteScalarAsync() > 0)
+                        {
+                            return Json(new { success = false, message = "El corredor ya está asociado a una categoría de esta carrera." });
+                        }
+                    }
+
+                    // Verificar si el corredor ya está vinculado a esta Carrera-Categoría (para evitar duplicados exactos)
                     string checkVinculoSql = @"
                 SELECT COUNT(*) 
                 FROM Vincula_participante 
@@ -660,22 +682,38 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
                         if ((int)await checkVinculoCommand.ExecuteScalarAsync() > 0)
                         {
-                            return Json(new { success = false, message = "El corredor ya está asociado a esta carrera." });
+                            return Json(new { success = false, message = "El corredor ya está asociado a esta categoría de la carrera." });
                         }
                     }
 
-                    // Insertar vínculo
+                    // INSERTAR EL VÍNCULO:
+                    // Se calcula el num_corredor y el folio_chip basado en la carrera, de modo que sean únicos por carrera.
                     string insertVinculoSql = @"
                 INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
-                VALUES (@IDCorredor, 
-                        @IDCarrCat,
-                        (SELECT ISNULL(MAX(num_corredor), 0) + 1 FROM Vincula_participante),
-                        'RFID' + CAST(1000000000 + (SELECT COUNT(*) + 1 FROM Vincula_participante) AS VARCHAR))";
+                VALUES (
+                    @IDCorredor, 
+                    @IDCarrCat,
+                    (
+                        SELECT ISNULL(MAX(vp.num_corredor), 0) + 1 
+                        FROM Vincula_participante vp
+                        INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                        WHERE cc.ID_carrera = @CarreraId
+                    ),
+                    'RFID' + CAST(
+                        1000000000 + (
+                            SELECT ISNULL(MAX(vp.num_corredor), 0) + 1 
+                            FROM Vincula_participante vp
+                            INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                            WHERE cc.ID_carrera = @CarreraId
+                        ) AS VARCHAR
+                    )
+                )";
 
                     using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection))
                     {
                         vinculoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
                         vinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
+                        vinculoCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
 
                         await vinculoCommand.ExecuteNonQueryAsync();
                     }
@@ -694,32 +732,27 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         [HttpGet]
         public async Task<IActionResult> ObtenerCategoriasPorCarrera_Corredor(int carreraId)
         {
-            var categorias = new List<string>();
-            string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-            using (SqlConnection connection = new SqlConnection(connectionString))
+            try
             {
-                await connection.OpenAsync();
-                string query = @"
-            SELECT DISTINCT cat.nombre_categoria
-            FROM CATEGORIA cat
-            INNER JOIN CARR_CAT cc ON cat.ID_categoria = cc.ID_categoria
-            WHERE cc.ID_carrera = @CarreraId";
+                // Reutilizamos la función que obtiene las categorías
+                var categorias = await ObtenerCategoriasPorCarrera(carreraId);
 
-                using (SqlCommand command = new SqlCommand(query, connection))
+                // Ordenamos las categorías de menor a mayor basado en el valor numérico extraído
+                var categoriasOrdenadas = categorias.OrderBy(c =>
                 {
-                    command.Parameters.AddWithValue("@CarreraId", carreraId);
-                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            categorias.Add(reader.GetString(0));
-                        }
-                    }
-                }
-            }
+                    // Se asume el formato "X km". Se divide la cadena para extraer el número.
+                    var parts = c.Split(' ');
+                    int km = (parts.Length > 0 && int.TryParse(parts[0], out int valor)) ? valor : 0;
+                    return km;
+                }).ToList();
 
-            return Json(categorias);
+                return Json(categoriasOrdenadas);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al obtener categorías para corredor: {ex.Message}");
+                return Json(new { error = "Ocurrió un error al cargar las categorías." });
+            }
         }
 
 
@@ -802,12 +835,11 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         [HttpPost]
         public async Task<IActionResult> Crear_Carrera(string nombreCarrera, int yearCarrera, List<int> categoriasSeleccionadas)
         {
+            // Validar que se hayan seleccionado exactamente tres categorías
             if (categoriasSeleccionadas == null || categoriasSeleccionadas.Count != 3)
             {
                 return Json(new { success = false, message = "Debes seleccionar exactamente tres categorías diferentes." });
             }
-
-            categoriasSeleccionadas.Sort(); // Ordenar las categorías seleccionadas de menor a mayor.
 
             string connectionString = _configuration.GetConnectionString("DefaultConnection");
             int idCarrera;
@@ -818,10 +850,13 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
+                    // Insertar la carrera y obtener el ID generado.
                     string insertCarreraSql = @"
                 INSERT INTO CARRERA (nom_carrera, year_carrera, edi_carrera)
                 OUTPUT INSERTED.ID_carrera
-                VALUES (@NombreCarrera, @YearCarrera,
+                VALUES (
+                    @NombreCarrera, 
+                    @YearCarrera,
                     COALESCE(
                         (SELECT MAX(edi_carrera) + 1 
                          FROM CARRERA 
@@ -838,13 +873,52 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         idCarrera = (int)await command.ExecuteScalarAsync();
                     }
 
+                    /* 
+                       Para ordenar las categorías de menor a mayor kilómetro, 
+                       se realiza una consulta para obtener el nombre de cada categoría.
+                       Se asume que el campo "nombre_categoria" contiene valores como "1 km", "10 km", "50 km".
+                    */
+                    string queryCategorias = $@"
+                SELECT ID_categoria, nombre_categoria 
+                FROM CATEGORIA 
+                WHERE ID_categoria IN ({string.Join(",", categoriasSeleccionadas)})";
+
+                    // Lista para almacenar (ID_categoria, kilometraje)
+                    List<(int id, int km)> categorias = new List<(int, int)>();
+
+                    using (SqlCommand command = new SqlCommand(queryCategorias, connection))
+                    {
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                int idCategoria = reader.GetInt32(0);
+                                string nombreCategoria = reader.GetString(1);
+
+                                // Extraer el número (kilometraje) del string. Se quita "km" y se hace trim.
+                                if (int.TryParse(nombreCategoria.Replace(" km", "").Replace("km", "").Trim(), out int km))
+                                {
+                                    categorias.Add((idCategoria, km));
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"No se pudo extraer el kilometraje de la categoría '{nombreCategoria}' (ID: {idCategoria}).");
+                                }
+                            }
+                        }
+                    }
+
+                    // Ordenar las categorías por el valor numérico (kilometraje) de menor a mayor.
+                    var categoriasOrdenadas = categorias.OrderBy(c => c.km).ToList();
+
+                    // Insertar cada relación en la tabla CARR_Cat.
                     string insertCategoriasSql = "INSERT INTO CARR_Cat (ID_carrera, ID_categoria) VALUES (@IDCarrera, @IDCategoria)";
-                    foreach (var categoriaId in categoriasSeleccionadas)
+                    foreach (var categoria in categoriasOrdenadas)
                     {
                         using (SqlCommand command = new SqlCommand(insertCategoriasSql, connection))
                         {
                             command.Parameters.AddWithValue("@IDCarrera", idCarrera);
-                            command.Parameters.AddWithValue("@IDCategoria", categoriaId);
+                            command.Parameters.AddWithValue("@IDCategoria", categoria.id);
                             await command.ExecuteNonQueryAsync();
                         }
                     }
@@ -1860,118 +1934,199 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
         }
 
 
+        private class CorredorDeArchivo : Corredor
+        {
+            public string Telefono { get; set; }
+
+            public CorredorDeArchivo(
+                string nom_corredor,
+                string apP_corredor,
+                string? apM_corredor,
+                DateTime f_corredor,
+                char sex_corredor,
+                string? correo,
+                string pais,
+                string? telefono)
+            {
+                Nom_corredor = nom_corredor;
+                this.apP_corredor = apP_corredor;
+                this.apM_corredor = apM_corredor ?? string.Empty;
+                this.f_corredor = f_corredor;
+                this.sex_corredor = sex_corredor;
+                c_corredor = correo ?? string.Empty;
+                pais_corredor = pais;
+                Telefono = telefono ?? string.Empty;
+            }
+        }
         [HttpPost]
         public async Task<IActionResult> Subir_ArchivoCorredor(string rutaArchivo, int carreraId, string categoriaNombre)
         {
-            if (!string.IsNullOrEmpty(rutaArchivo) && System.IO.File.Exists(rutaArchivo))
+            if (string.IsNullOrEmpty(rutaArchivo) || !System.IO.File.Exists(rutaArchivo))
             {
-                try
+                _logger.LogError("La ruta del archivo no es válida o no existe.");
+                return Json(new { success = false, message = "La ruta del archivo no es válida." });
+            }
+
+            Queue<CorredorDeArchivo> colaCorredores = new Queue<CorredorDeArchivo>();
+            int filasProcesadas = 0;
+            int errores = 0;
+
+            // Primer bloque: Abrir y leer el archivo para encolar la información
+            try
+            {
+                _logger.LogInformation($"Procesando archivo en la ruta: {rutaArchivo}");
+                using (var workbook = new XLWorkbook(rutaArchivo))
                 {
-                    _logger.LogInformation($"Procesando archivo en la ruta: {rutaArchivo}");
-                    int filasProcesadas = 0;
-                    int errores = 0;
+                    var worksheet = workbook.Worksheet(1);
+                    var filas = worksheet.RowsUsed();
 
-                    using (var workbook = new XLWorkbook(rutaArchivo))
+                    foreach (var fila in filas.Skip(1)) // Saltar encabezados
                     {
-                        var worksheet = workbook.Worksheet(1);
-                        var filas = worksheet.RowsUsed();
-
-                        foreach (var fila in filas.Skip(1)) // Saltar encabezados
+                        if (fila.Cells().All(cell => cell.IsEmpty()))
                         {
-                            try
+                            _logger.LogWarning($"Fila {fila.RowNumber()} está vacía. Saltando.");
+                            continue;
+                        }
+
+                        // Extracción de datos
+                        var nom_corredor = fila.Cell(1).GetString();
+                        var apellido_paterno = fila.Cell(2).GetString();
+                        var apellido_materno = fila.Cell(3).GetString();
+                        var fecha_cumpleanios_celda = fila.Cell(4);
+                        var sexo_corredor = fila.Cell(5).GetString().Trim();
+                        var correo_corredor = fila.Cell(6).GetString();
+                        var pais = fila.Cell(7).GetString();
+                        var telefono = fila.Cell(8).GetString();
+
+                        if (string.IsNullOrEmpty(nom_corredor) || string.IsNullOrEmpty(apellido_paterno) || string.IsNullOrEmpty(pais))
+                        {
+                            _logger.LogWarning($"Error en fila {fila.RowNumber()}: Los campos de nombre, apellido paterno y país son obligatorios.");
+                            errores++;
+                            continue;
+                        }
+
+                        // Validar el sexo
+                        if (string.IsNullOrEmpty(sexo_corredor) || (sexo_corredor != "M" && sexo_corredor != "F"))
+                        {
+                            _logger.LogWarning($"Error en fila {fila.RowNumber()}: Sexo '{sexo_corredor}' no válido. Debe ser 'M' o 'F'.");
+                            errores++;
+                            continue;
+                        }
+
+                        DateTime fechaCumpleanios;
+                        if (fecha_cumpleanios_celda.TryGetValue(out fechaCumpleanios))
+                        {
+                            if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
                             {
-                                if (fila.Cells().All(cell => cell.IsEmpty()))
-                                {
-                                    _logger.LogWarning($"Fila {fila.RowNumber()} está vacía. Saltando.");
-                                    continue;
-                                }
-
-                                var nom_corredor = fila.Cell(1).GetString();
-                                var apellido_paterno = fila.Cell(2).GetString();
-                                var apellido_materno = fila.Cell(3).GetString();
-                                var fecha_cumpleanios_celda = fila.Cell(4);
-                                var sexo_corredor = fila.Cell(5).GetString().Trim();
-                                var correo_corredor = fila.Cell(6).GetString();
-                                var pais = fila.Cell(7).GetString();
-                                var telefono = fila.Cell(8).GetString();
-
-                                if (sexo_corredor != "M" && sexo_corredor != "F")
-                                {
-                                    _logger.LogError($"Error en fila {fila.RowNumber()}: Sexo '{sexo_corredor}' no válido.");
-                                    errores++;
-                                    continue;
-                                }
-
-                                if (fecha_cumpleanios_celda.TryGetValue(out DateTime fechaCumpleanios))
-                                {
-                                    // La celda ya es de tipo fecha y se puede procesar directamente
-                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
-                                        errores++;
-                                        continue;
-                                    }
-                                }
-                                else
-                                {
-                                    var fechaTexto = fecha_cumpleanios_celda.GetString().Trim();
-                                    if (!DateTime.TryParseExact(fechaTexto, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out fechaCumpleanios))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaTexto}' no válida. Asegúrese de usar el formato ISO 8601 (YYYY-MM-DD).");
-                                        errores++;
-                                        continue;
-                                    }
-
-                                    // Validar rango nuevamente
-                                    if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
-                                    {
-                                        _logger.LogError($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
-                                        errores++;
-                                        continue;
-                                    }
-                                }
-
-                                _logger.LogInformation($"Procesando fila {fila.RowNumber()}: {nom_corredor} {apellido_paterno}.");
-                                await Crear_Corredor(
-                                    Nombre: nom_corredor,
-                                    Apaterno: apellido_paterno,
-                                    Amaterno: apellido_materno,
-                                    Fnacimiento: fechaCumpleanios,
-                                    Sexo: sexo_corredor,
-                                    Correo: correo_corredor,
-                                    Pais: pais,
-                                    Telefono: telefono,
-                                    CarreraId: carreraId,
-                                    CategoriaNombre: categoriaNombre
-                                );
-
-                                filasProcesadas++;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, $"Error procesando fila {fila.RowNumber()}: {ex.Message}");
+                                _logger.LogWarning($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
                                 errores++;
                                 continue;
                             }
                         }
+                        else
+                        {
+                            var fechaTexto = fecha_cumpleanios_celda.GetString().Trim();
+                            if (!DateTime.TryParseExact(fechaTexto, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out fechaCumpleanios))
+                            {
+                                _logger.LogWarning($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaTexto}' no válida. Use el formato ISO 8601 (YYYY-MM-DD).");
+                                errores++;
+                                continue;
+                            }
+                            if (fechaCumpleanios < new DateTime(1753, 1, 1) || fechaCumpleanios > new DateTime(9999, 12, 31))
+                            {
+                                _logger.LogWarning($"Error en fila {fila.RowNumber()}: Fecha de nacimiento '{fechaCumpleanios}' fuera del rango permitido (1753-9999).");
+                                errores++;
+                                continue;
+                            }
+                        }
+
+                        _logger.LogInformation($"Encolando fila {fila.RowNumber()}: {nom_corredor} {apellido_paterno}.");
+
+                        // Crear el objeto CorredorDeArchivo y encolarlo
+                        var corredorArchivo = new CorredorDeArchivo(
+                            nom_corredor,
+                            apellido_paterno,
+                            apellido_materno,
+                            fechaCumpleanios,
+                            sexo_corredor[0],
+                            correo_corredor,
+                            pais,
+                            telefono
+                        );
+                        colaCorredores.Enqueue(corredorArchivo);
                     }
-
-                    var message = errores == 0
-                        ? $"{filasProcesadas} corredores procesados exitosamente."
-                        : $"Archivo procesado con errores: {filasProcesadas} filas exitosas, {errores} errores.";
-
-                    _logger.LogInformation(message);
-                    return Json(new { success = true, message });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error al procesar el archivo: {ex.Message}");
-                    return Json(new { success = false, message = $"Error al procesar el archivo: {ex.Message}" });
                 }
             }
+            catch (IOException ex_io)
+            {
+                // Verificar si el error es por archivo en uso por otro proceso
+                if (ex_io.Message.Contains("being used by another process"))
+                {
+                    _logger.LogError(ex_io, $"Error al abrir y leer el archivo: {ex_io.Message}");
+                    return Json(new { success = false, message = "Otro proceso está usando este archivo,\nfavor de cerrarlo." });
+                }
+                else
+                {
+                    _logger.LogError(ex_io, $"Error desconocido al abrir y/o leer el archivo: {ex_io.Message}");
+                    return Json(new { success = false, message = $"Error al procesar el archivo: {ex_io.Message}" });
+                }
+            }
+            catch (Exception ex_excel)
+            {
+                _logger.LogError(ex_excel, $"Error al abrir y leer el archivo: {ex_excel.Message}");
+                return Json(new { success = false, message = $"Error al procesar el archivo: {ex_excel.Message}" });
+            }
 
-            _logger.LogError("La ruta del archivo no es válida o no existe.");
-            return Json(new { success = false, message = "La ruta del archivo no es válida." });
+            // Segundo bloque: Vaciar la cola e insertar cada corredor usando Crear_Corredor
+            try
+            {
+                while (colaCorredores.Count > 0)
+                {
+                    var corredor = colaCorredores.Dequeue();
+                    try
+                    {
+                        _logger.LogInformation($"Procesando corredor: {corredor.Nom_corredor} {corredor.apP_corredor}.");
+                        await Crear_Corredor(
+                            Nombre: corredor.Nom_corredor,
+                            Apaterno: corredor.apP_corredor,
+                            Amaterno: corredor.apM_corredor,
+                            Fnacimiento: corredor.f_corredor,
+                            Sexo: corredor.sex_corredor.ToString(),
+                            Correo: corredor.c_corredor,
+                            Pais: corredor.pais_corredor,
+                            Telefono: corredor.Telefono,
+                            CarreraId: carreraId,
+                            CategoriaNombre: categoriaNombre
+                        );
+                        filasProcesadas++;
+                    }
+                    catch (Exception ex_crear)
+                    {
+                        _logger.LogWarning(ex_crear, $"Error al procesar el corredor {corredor.Nom_corredor} {corredor.apP_corredor}: {ex_crear.Message}");
+                        errores++;
+                        continue;
+                    }
+                }
+            }
+            catch (Exception ex_queue)
+            {
+                _logger.LogError(ex_queue, "Error al procesar la queue de corredores.");
+                return Json(new { success = false, message = "Error al procesar los corredores en la lista." });
+            }
+
+            // Construir el mensaje final basado en la cantidad de errores y éxitos
+            string mensajeFinal;
+            if (errores > 0)
+            {
+                mensajeFinal = $"Se procesaron {filasProcesadas} corredores, pero se presentaron errores en {errores} número de filas.";
+                _logger.LogWarning(mensajeFinal);
+            }
+            else
+            {
+                mensajeFinal = $"{filasProcesadas} corredores procesados exitosamente.";
+            }
+
+            return Json(new { success = true, message = mensajeFinal, errorCount = errores });
         }
 
         [HttpGet]

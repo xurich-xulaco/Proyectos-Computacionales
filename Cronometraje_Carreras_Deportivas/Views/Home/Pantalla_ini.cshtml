@@ -15,31 +15,52 @@
         </div>
     </div>
 </nav>
-<div class="row " style="background-color:#004A98;">
+<div class="row" style="background-color:#004A98;">
     <div class="col"></div>
+
+    <!--Gestión de corredores-->
     <div class="col">
-        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98;  color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">Gestión de corredores</button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Crear_Corredor", "Home")'">Nuevo Corredor</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Eliminar_Corredor", "Home")'">Eliminar Corredor</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Modificar_Corredor", "Home")'">Modificar Corredor</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_Corredores", "Home")'">Importar corredores</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Importar_tiempos", "Home")'">Importar tiempos</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Exportar_corredor", "Home")'">Exportar Corredor</button></li>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_corredor", "Home")'">Reporte de Corredor</button></li>
-    </ul>
+        <div class="dropdown">
+            <button type="button" class="btn dropdown-toggle" style="background-color:#004A98; color: white; width: max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">
+                Gestión de corredores
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
+                <li><a class="dropdown-item" href="@Url.Action("Crear_Corredor", "Home")">Nuevo Corredor</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Eliminar_Corredor", "Home")">Eliminar Corredor</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Modificar_Corredor", "Home")">Modificar Corredor</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Importar_Corredores", "Home")">Importar corredores</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Importar_tiempos", "Home")">Importar tiempos</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Exportar_corredor", "Home")">Exportar Corredor</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Reporte_corredor", "Home")">Reporte de Corredor</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!--Gestión de carreras-->
+    <div class="col">
+        <div class="dropdown">
+            <button type="button" class="btn dropdown-toggle" style="background-color:#004A98; color: white; width: max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">
+                Gestión de carreras
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
+                <li><a class="dropdown-item" href="@Url.Action("Crear_Carrera", "Home")">Nueva Carrera</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Eliminar_Carrera", "Home")">Eliminar Carrera</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Editar_Carrera", "Home")">Editar Carrera</a></li>
+                <li><a class="dropdown-item" href="@Url.Action("Reporte_carrera", "Home")">Generar reporte de carrera</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col">
+        <button class="btn" style="background-color:#004A98; color: white; width: max-content;">
+            Mostrar base de datos
+        </button>
     </div>
     <div class="col">
-        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">Gestión de carreras</button>
-    <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Crear_Carrera", "Home")'">Nueva Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Eliminar_Carrera", "Home")'">Eliminar Carrera</button>
-        <button class="dropdown-item" onclick="window.location.href='@Url.Action("Editar_Carrera", "Home")'">Editar Carrera</button>
-        <li> <button class="dropdown-item" type="button" data-bs-toggle="modal" onclick="location.href='@Url.Action("Reporte_carrera", "Home")'">Generar reporte de carrera</button></li>
-    </ul>
+        <button class="btn" style="background-color:#004A98; color: white; width: max-content;">
+            Exportar resultados
+        </button>
     </div>
-    <div class="col"><button class="btn " style="background-color:#004A98;color: white; width:max-content;">Mostrar base de datos </button></div>
-    <div class="col"><button class="btn " style="background-color:#004A98;color: white;width:max-content;">Exportar resultados</button></div>
     <div class="col"></div>
 </div>
 
@@ -286,16 +307,28 @@
 <script>
     // Cargar las carreras en el desplegable
     async function cargarCarreras() {
-        const response = await fetch('@Url.Action("ObtenerCarreras", "Home")');
-        const carreras = await response.json();
+        try {
+            const response = await fetch('@Url.Action("ObtenerCarreras", "Home")');
+            const carreras = await response.json();
 
-        const select = document.getElementById('carreraSeleccionada');
-        carreras.forEach(carrera => {
-            const option = document.createElement('option');
-            option.value = carrera.Id;
-            option.textContent = carrera.Descripcion;
-            select.appendChild(option);
-        });
+            const select = document.getElementById('carreraSeleccionada');
+
+            // Verificar que 'carreras' es un array
+            if (Array.isArray(carreras)) {
+                carreras.forEach(carrera => {
+                const option = document.createElement('option');
+                option.value = carrera.Id;
+                option.textContent = carrera.Descripcion;
+                select.appendChild(option);
+                });
+            } else {
+                console.error("Se esperaba un array, pero se recibió:", carreras);
+                Swal.fire('Error', 'No se pudieron encontrar datos válidos para las carreras. Verifica tu conexión.', 'error');
+            }
+        } catch (error) {
+            console.error("Error en cargarCarreras:", error);
+            Swal.fire('Error', 'No se pudieron cargar las carreras. Verifica tu conexión.', 'error');
+        }
     }
 
     // Cargar los parámetros de la carrera seleccionada
