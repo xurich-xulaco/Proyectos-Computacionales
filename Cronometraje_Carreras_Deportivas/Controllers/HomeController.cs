@@ -1662,7 +1662,6 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
             return Json(corredores);
         }
-
         [HttpGet]
         public async Task<IActionResult> Modificar_Corredor(int year, int edition, string category, int numCorredor)
         {
@@ -1676,17 +1675,17 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     string query = @"
-            SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor, 
-                   c.sex_corredor, c.pais, c.c_corredor, vp.ID_corredor
-            FROM CORREDOR c
-            JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
-            JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
-            JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
-            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-            WHERE ca.year_carrera = @Year 
-              AND ca.edi_carrera = @Edition 
-              AND cat.nombre_categoria = @Category 
-              AND vp.num_corredor = @NumCorredor";
+                    SELECT c.nom_corredor, c.apP_corredor, c.apM_corredor, c.f_corredor,
+                           c.sex_corredor, c.pais, c.c_corredor, vp.ID_corredor
+                    FROM CORREDOR c
+                    JOIN Vincula_participante vp ON c.ID_corredor = vp.ID_corredor
+                    JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                    JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                    WHERE ca.year_carrera = @Year 
+                      AND ca.edi_carrera = @Edition 
+                      AND cat.nombre_categoria = @Category 
+                      AND vp.num_corredor = @NumCorredor";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -1727,33 +1726,49 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             }
         }
 
+        // Actualizar datos del corredor
         [HttpPost]
         public async Task<IActionResult> ActualizarCorredor(
-            int ID_corredor, string nombre, string apellidoPaterno, string apellidoMaterno,
+            int year, int edition, string category, int numCorredor,
+            string nombre, string apellidoPaterno, string apellidoMaterno,
             string fechaNacimiento, string sexo, string pais, string correo)
         {
+            if (year <= 0 || edition <= 0 || string.IsNullOrEmpty(category) || numCorredor <= 0)
+            {
+                return Json(new { success = false, message = "Parámetros inválidos." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
             try
             {
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
                     string updateQuery = @"
-            UPDATE CORREDOR
-            SET nom_corredor = @Nombre, 
-                apP_corredor = @ApellidoPaterno, 
-                apM_corredor = @ApellidoMaterno, 
-                f_corredor = @FechaNacimiento, 
-                sex_corredor = @Sexo, 
-                pais = @Pais, 
-                c_corredor = @Correo
-            WHERE ID_corredor = @ID_corredor";
+                    UPDATE CORREDOR
+                    SET nom_corredor = @Nombre, 
+                        apP_corredor = @ApellidoPaterno, 
+                        apM_corredor = @ApellidoMaterno, 
+                        f_corredor = @FechaNacimiento, 
+                        sex_corredor = @Sexo, 
+                        pais = @Pais, 
+                        c_corredor = @Correo
+                    WHERE ID_corredor = (
+                        SELECT vp.ID_corredor
+                        FROM Vincula_participante vp
+                        JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                        JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        WHERE ca.year_carrera = @Year 
+                          AND ca.edi_carrera = @Edition 
+                          AND cat.nombre_categoria = @Category 
+                          AND vp.num_corredor = @NumCorredor
+                    )";
 
                     using (SqlCommand command = new SqlCommand(updateQuery, connection))
                     {
-                        command.Parameters.AddWithValue("@ID_corredor", ID_corredor);
                         command.Parameters.AddWithValue("@Nombre", nombre);
                         command.Parameters.AddWithValue("@ApellidoPaterno", apellidoPaterno);
                         command.Parameters.AddWithValue("@ApellidoMaterno", apellidoMaterno);
@@ -1761,19 +1776,31 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         command.Parameters.AddWithValue("@Sexo", sexo);
                         command.Parameters.AddWithValue("@Pais", pais);
                         command.Parameters.AddWithValue("@Correo", correo);
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@Edition", edition);
+                        command.Parameters.AddWithValue("@Category", category);
+                        command.Parameters.AddWithValue("@NumCorredor", numCorredor);
 
-                        await command.ExecuteNonQueryAsync();
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected > 0)
+                        {
+                            return Json(new { success = true, message = "Información actualizada correctamente." });
+                        }
+                        else
+                        {
+                            return Json(new { success = false, message = "No se encontró el corredor." });
+                        }
                     }
                 }
-
-                return RedirectToAction("Pantalla_ini");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al actualizar corredor: {ex.Message}");
-                return View("Error");
+                _logger.LogError($"Error al actualizar: {ex.Message}");
+                return Json(new { success = false, message = "Error al actualizar los datos." });
             }
         }
+
 
 
         [HttpPost]

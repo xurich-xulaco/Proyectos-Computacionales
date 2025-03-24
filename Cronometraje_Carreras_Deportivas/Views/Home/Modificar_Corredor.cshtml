@@ -2,79 +2,55 @@
     ViewData["Title"] = "Modificar Corredor";
 }
 
-<!-- Navbar con logo -->
-<nav class="navbar navbar-expand-sm header">
-    <div class="container-fluid">
-        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="Logo UASLP"
-             style="max-width: 15%;">
-    </div>
-</nav>
-
-<!-- Contenedor principal -->
 <div class="container mt-5">
     <h2 class="text-center">Modificar Corredor</h2>
     <div class="row justify-content-center">
         <div class="col-md-10">
             <form id="modificarCorredorForm" method="post" action="/Home/ActualizarCorredor">
-                <input type="hidden" name="ID_corredor" value="@ViewBag.Corredor["ID_corredor"]" />
                 <input type="hidden" name="year" value="@ViewBag.Year" />
                 <input type="hidden" name="edition" value="@ViewBag.Edition" />
                 <input type="hidden" name="category" value="@ViewBag.Category" />
                 <input type="hidden" name="numCorredor" value="@ViewBag.NumCorredor" />
 
                 <div class="row">
-                    <!-- Columna Izquierda -->
                     <div class="col-md-6">
-                        <div class="form-group mb-3">
-                            <label for="nombre" class="form-label"><strong>Nombre:</strong></label>
-                            <input type="text" id="nombre" name="nombre" class="form-control"
-                                   value="@ViewBag.Corredor["Nombre"]" required>
+                        <div class="mb-3">
+                            <label>Nombre:</label>
+                            <input type="text" name="nombre" class="form-control" value="@ViewBag.Corredor["Nombre"]" required />
                         </div>
-
-                        <div class="form-group mb-3">
-                            <label for="apellidoPaterno" class="form-label"><strong>Apellido Paterno:</strong></label>
-                            <input type="text" id="apellidoPaterno" name="apellidoPaterno" class="form-control"
-                                   value="@ViewBag.Corredor["ApellidoPaterno"]" required>
+                        <div class="mb-3">
+                            <label>Apellido Paterno:</label>
+                            <input type="text" name="apellidoPaterno" class="form-control" value="@ViewBag.Corredor["ApellidoPaterno"]" required />
                         </div>
-
-                        <div class="form-group mb-3">
-                            <label for="apellidoMaterno" class="form-label"><strong>Apellido Materno:</strong></label>
-                            <input type="text" id="apellidoMaterno" name="apellidoMaterno" class="form-control"
-                                   value="@ViewBag.Corredor["ApellidoMaterno"]">
+                        <div class="mb-3">
+                            <label>Apellido Materno:</label>
+                            <input type="text" name="apellidoMaterno" class="form-control" value="@ViewBag.Corredor["ApellidoMaterno"]" />
                         </div>
-
-                        <div class="form-group mb-3">
-                            <label for="fechaNacimiento" class="form-label"><strong>Fecha de Nacimiento:</strong></label>
-                            <input type="date" id="fechaNacimiento" name="fechaNacimiento" class="form-control"
-                                   value="@ViewBag.Corredor["FechaNacimiento"]" required>
+                        <div class="mb-3">
+                            <label>Fecha de Nacimiento:</label>
+                            <input type="date" name="fechaNacimiento" class="form-control" value="@ViewBag.Corredor["FechaNacimiento"]" required />
                         </div>
                     </div>
 
-                    <!-- Columna Derecha -->
                     <div class="col-md-6">
-                        <div class="form-group mb-3">
-                            <label class="form-label"><strong>Sexo:</strong></label>
+                        <div class="mb-3">
+                            <label>Sexo:</label>
                             <select name="sexo" class="form-control">
                                 <option value="M" selected="@(ViewBag.Corredor["Sexo"] == "M")">Masculino</option>
                                 <option value="F" selected="@(ViewBag.Corredor["Sexo"] == "F")">Femenino</option>
                             </select>
                         </div>
-
-                        <div class="form-group mb-3">
-                            <label for="pais" class="form-label"><strong>País:</strong></label>
-                            <input type="text" id="pais" name="pais" class="form-control"
-                                   value="@ViewBag.Corredor["Pais"]" required>
+                        <div class="mb-3">
+                            <label>País:</label>
+                            <input type="text" name="pais" class="form-control" value="@ViewBag.Corredor["Pais"]" required />
                         </div>
-
-                        <div class="form-group mb-3">
-                            <label for="correo" class="form-label"><strong>Correo:</strong></label>
-                            <input type="email" id="correo" name="correo" class="form-control"
-                                   value="@ViewBag.Corredor["Correo"]">
+                        <div class="mb-3">
+                            <label>Correo:</label>
+                            <input type="email" name="correo" class="form-control" value="@ViewBag.Corredor["Correo"]" />
                         </div>
                     </div>
                 </div>
 
-                <!-- Botones de acción -->
                 <div class="d-flex justify-content-between mt-4">
                     <a href="/Home/Pantalla_ini" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-success">Guardar Cambios</button>
@@ -87,24 +63,29 @@
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        $(document).ready(function () {
-            $('#modificarCorredorForm').submit(function (event) {
-                event.preventDefault(); // Evita el envío automático del formulario
+        $('#modificarCorredorForm').on('submit', function (e) {
+            e.preventDefault();
 
-                Swal.fire({
-                    title: 'Confirmar cambios',
-                    text: "¿Estás seguro de modificar la información del corredor?",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Sí, modificar',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#28a745',
-                    cancelButtonColor: '#6c757d'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        this.submit(); // Envía el formulario después de la confirmación
-                    }
-                });
+            Swal.fire({
+                title: 'Confirmar cambios',
+                text: "¿Estás seguro de que deseas modificar la información del corredor?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, modificar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post('/Home/ActualizarCorredor', $(this).serialize())
+                        .done(function (data) {
+                            if (data.success) {
+                                Swal.fire('¡Actualizado!', data.message, 'success').then(() => {
+                                    window.location.href = '/Home/Pantalla_ini';
+                                });
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        });
+                }
             });
         });
     </script>
