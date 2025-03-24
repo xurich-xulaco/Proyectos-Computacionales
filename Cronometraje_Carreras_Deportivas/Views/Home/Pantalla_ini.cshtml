@@ -315,19 +315,23 @@
 
             // Verificar que 'carreras' es un array
             if (Array.isArray(carreras)) {
+                if (carreras.length === 0) {
+                        Swal.fire('Advertencia', 'No hay carreras disponibles o algunas no tienen categorías asignadas. Contacta al administrador.', 'warning');
+                }
+
                 carreras.forEach(carrera => {
-                const option = document.createElement('option');
-                option.value = carrera.Id;
-                option.textContent = carrera.Descripcion;
-                select.appendChild(option);
+                    const option = document.createElement('option');
+                    option.value = carrera.Id;
+                    option.textContent = carrera.Descripcion;
+                    select.appendChild(option);
                 });
             } else {
                 console.error("Se esperaba un array, pero se recibió:", carreras);
                 Swal.fire('Error', 'No se pudieron encontrar datos válidos para las carreras. Verifica tu conexión.', 'error');
             }
         } catch (error) {
-            console.error("Error en cargarCarreras:", error);
-            Swal.fire('Error', 'No se pudieron cargar las carreras. Verifica tu conexión.', 'error');
+            console.error("Error en a la hora de cargar carreras:", error);
+            Swal.fire('Error', 'Hubo un error cargando las carreras. Verifica tu conexión.', 'error');
         }
     }
 

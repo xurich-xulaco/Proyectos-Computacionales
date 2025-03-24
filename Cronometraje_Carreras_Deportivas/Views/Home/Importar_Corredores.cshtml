@@ -15,13 +15,13 @@
         <div class="form">
 
 
-            <form id="importar-corredores-form" class="container">
+            <form id="importar-corredores-form" class="container" enctype="multipart/form-data">
                 <h2>Importar Corredores desde Excel</h2>
-                <!-- Ruta del archivo -->
+                <!-- Selección del archivo -->
                 <div class="form-row">
                     <div class="form-group col-md-12">
-                        <label for="rutaArchivo">Ruta del Archivo Excel <span class="text-danger">*</span> <span>(folio, nombre, ap paterno, ap, materno) </span></label>
-                        <input type="text" class="form-control" id="rutaArchivo" name="rutaArchivo" placeholder="Ejemplo: C:\archivos\corredores.xlsx" required />
+                        <label for="archivoExcel">Archivo Excel <span class="text-danger">*</span> <span>(folio, nombre, ap paterno, ap materno, etc.)</span></label>
+                        <input type="file" class="form-control" id="archivoExcel" name="archivoExcel" accept=".xlsx, .xls" required />
                     </div>
                 </div>
 
@@ -90,11 +90,11 @@
 
         // Manejo del botón "Importar"
         $("#importar-btn").click(function () {
-            const rutaArchivo = $("#rutaArchivo").val();
+            const archivoExcel = $("#archivoExcel")[0].files[0];
             const carreraId = $("#CarreraId").val();
             const categoriaNombre = $("#CategoriaId").val();
 
-            if (!rutaArchivo || !carreraId || !categoriaNombre) {
+            if (!archivoExcel || !carreraId || !categoriaNombre) {
                 Swal.fire({
                     icon: "warning",
                     title: "Campos incompletos",
@@ -103,36 +103,61 @@
                 return;
             }
 
-            $.post("/Home/Subir_ArchivoCorredor", { rutaArchivo, carreraId, categoriaNombre }, function (response) {
-                if (response.success) {
-                    if(response.errorCount > 0) {
-                        Swal.fire({
-                            icon: "warning",
-                            title: "Atención",
-                            text: response.message,
-                        });
+            const formData = new FormData();
+            formData.append("archivoExcel", archivoExcel);
+            formData.append("carreraId", carreraId);
+            formData.append("categoriaNombre", categoriaNombre);
+
+            // Mostrar pantalla de carga
+            Swal.fire({
+                title: 'Procesando...',
+                text: 'Por favor, espera mientras se procesa el archivo.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: "/Home/Subir_ArchivoCorredor",
+                type: "POST",
+                data: formData,
+                processData: false, // importante para enviar FormData
+                contentType: false, // importante para enviar FormData
+                success: function (response) {
+                    if (response.success) {
+                        Swal.close();
+                        if (response.errorCount > 0) {
+                            Swal.fire({
+                                icon: "warning",
+                                title: "Atención",
+                                text: response.message,
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: "success",
+                                title: "Éxito",
+                                text: response.message,
+                            }).then(() => {
+                                window.location.href = "/Home/Pantalla_ini";
+                            });
+                        }
                     } else {
                         Swal.fire({
-                            icon: "success",
-                            title: "Éxito",
+                            icon: "error",
+                            title: "Error",
                             text: response.message,
-                        }).then(() => {
-                            window.location.href = "/Home/Pantalla_ini";
                         });
                     }
-                } else {
+                },
+                error: function (xhr, status, error) {
+                    Swal.close();
                     Swal.fire({
                         icon: "error",
-                        title: "Error",
-                        text: response.message,
+                        title: "Error en el servidor",
+                        text: `Error al procesar la solicitud: ${error}`,
                     });
                 }
-            }).fail(function (xhr, status, error) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Error en el servidor",
-                    text: `Error al procesar la solicitud: ${error}`,
-                });
             });
         });
     });

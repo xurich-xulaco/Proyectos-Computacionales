@@ -84,7 +84,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         }
 
         [HttpGet]
-        public IActionResult DownloadReporte(string fileName)
+        public IActionResult DownloadReporte(string fileName, string downloadName = null)
         {
             try
             {
@@ -121,7 +121,9 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 }
 
                 _logger.LogInformation("Link de descarga completamente generado.");
-                return File(fileBytes, "application/pdf", "ReporteCarrera.pdf");
+                // Si downloadName se suministra, se usa para la descarga; de lo contrario, se usa el nombre almacenado.
+                string finalDownloadName = string.IsNullOrWhiteSpace(downloadName) ? "Reporte.pdf" : downloadName;
+                return File(fileBytes, "application/pdf", finalDownloadName);
             }
             catch (Exception ex)
             {
@@ -285,8 +287,8 @@ SELECT
     RANK() OVER (ORDER BY 
         (DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
          DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-         DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00'))),
-        v.num_corredor
+         DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')) +
+         DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')))
     ) AS Posicion,
     COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
     COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
@@ -294,19 +296,22 @@ SELECT
     CONVERT(TIME, DATEADD(SECOND, 
         DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
         DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')),
+        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')) +
+        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
         0
     )) AS TiempoTotal
 FROM CARRERA ca
 JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_carr_cat
+JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
 LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
 LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
 LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
 WHERE 
     ca.ID_carrera = @idCarrera
     AND cc.ID_categoria = @idCategoria
-    AND v.num_corredor = @numCorredor;";
+    AND v.num_corredor = @numCorredor;
+";
 
             using (SqlCommand command = new SqlCommand(queryTiempos, connection))
             {
@@ -508,10 +513,24 @@ WHERE
                     string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
                     if (!Directory.Exists(tempFolder))
                         Directory.CreateDirectory(tempFolder);
-                    string fileName = $"ReporteCorredor_{Guid.NewGuid()}.pdf";
-                    string filePath = Path.Combine(tempFolder, fileName);
+                    // Nombre para almacenar (con GUID para evitar colisiones)
+                    string storageFileName = $"Reporte Corredor_{Guid.NewGuid()}.pdf";
+                    // Nombre limpio para mostrar al usuario
+                    string downloadFileName = string.Empty;
+                    if (!string.IsNullOrWhiteSpace(corredorInfo.Nombre))
+                    {
+                        var nombres = corredorInfo.Nombre.Split(' ');
+                        if (nombres.Length > 1)
+                        {
+                            var apellidoPaterno = nombres[1];
+                            downloadFileName = $"Reporte Corredor_{apellidoPaterno}.pdf";
+                        }
+                    }
+                    string filePath = Path.Combine(tempFolder, storageFileName);
                     System.IO.File.WriteAllBytes(filePath, ms.ToArray());
-                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName });
+
+                    // Generar URL de descarga pasando ambos parámetros
+                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName = storageFileName, downloadName = downloadFileName });
                     return Json(new { success = true, downloadUrl = downloadUrl });
                 }
             }
@@ -700,9 +719,9 @@ WHERE
             var ListaPodio = new Queue<ReporteCarreras_Podio>();
             string PodioQuery;
 
-            switch(TipoDeSexo)
+            switch (TipoDeSexo)
             {
-                case 0:
+                case 0: // Mixto
                     PodioQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -752,7 +771,8 @@ SELECT TOP 3
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
-                case 1:
+
+                case 1: // Mujeres
                     PodioQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -803,7 +823,8 @@ SELECT TOP 3
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
-                case 2:
+
+                case 2: // Hombres
                     PodioQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -854,6 +875,7 @@ SELECT TOP 3
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
+
                 default:
                     PodioQuery = string.Empty;
                     _logger.LogWarning("No se eligió un podio válido para consultas en el reporte de la carrera.");
@@ -868,7 +890,6 @@ ORDER BY Posicion;";
                 {
                     while (await reader.ReadAsync())
                     {
-                        // Concatenar el nombre completo a partir de los fragmentos
                         string nombreCompleto = $"{reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}";
                         var reporte = new ReporteCarreras_Podio(
                             NPosicion: reader["Posicion"].ToString(),
@@ -894,7 +915,7 @@ ORDER BY Posicion;";
 
             switch (TipoDeSexo)
             {
-                case 0:
+                case 0: // Mixto
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -920,7 +941,8 @@ TotalTiempos AS (
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMixto
 FROM TotalTiempos;";
                     break;
-                case 1:
+
+                case 1: // Mujeres
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -948,7 +970,8 @@ TotalTiempos AS (
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMujeres
 FROM TotalTiempos;";
                     break;
-                case 2:
+
+                case 2: // Hombres
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -976,9 +999,10 @@ TotalTiempos AS (
 SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoHombres
 FROM TotalTiempos;";
                     break;
+
                 default:
                     MenorTiempo = string.Empty;
-                    _logger.LogWarning("No se eleigió un sexo valido para consultas de menor tiempo en el reporte de la carrera.");
+                    _logger.LogWarning("No se eligió un sexo válido para consultas de menor tiempo en el reporte de la carrera.");
                     return MenorTiempo;
             }
             using (SqlCommand menorTiempoCmd = new SqlCommand(TiempoQuery, connection))
@@ -998,7 +1022,7 @@ FROM TotalTiempos;";
 
             switch (TipoDeSexo)
             {
-                case 0:
+                case 0: // Mixto
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -1021,10 +1045,11 @@ TotalTiempos AS (
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioMixto
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMixto
 FROM TotalTiempos;";
                     break;
-                case 1:
+
+                case 1: // Mujeres
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -1049,10 +1074,11 @@ TotalTiempos AS (
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'F'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioMujeres
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMujeres
 FROM TotalTiempos;";
                     break;
-                case 2:
+
+                case 2: // Hombres
                     TiempoQuery = @"
 WITH TiemposCorredor AS (
     SELECT 
@@ -1077,12 +1103,13 @@ TotalTiempos AS (
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'M'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, AVG(TiempoTotalSegundos), 0)) AS TiempoPromedioHombres
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioHombres
 FROM TotalTiempos;";
                     break;
+
                 default:
                     TiempoPromedio = string.Empty;
-                    _logger.LogWarning("No se eleigió un sexo valido para consultas de tiempo promedio en el reporte de la carrera.");
+                    _logger.LogWarning("No se eligió un sexo válido para consultas de tiempo promedio en el reporte de la carrera.");
                     return TiempoPromedio;
             }
             using (SqlCommand TiempoPromedioCmd = new SqlCommand(TiempoQuery, connection))
@@ -1531,12 +1558,15 @@ FROM TotalTiempos;";
                     string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
                     if (!Directory.Exists(tempFolder))
                         Directory.CreateDirectory(tempFolder);
-                    string fileName = $"ReporteCarrera_{Guid.NewGuid()}.pdf";
-                    string filePath = Path.Combine(tempFolder, fileName);
+                    // Nombre limpio para la descarga: Se incluye el año de la carrera en el nombre del reporte
+                    string downloadFileName = $"Reporte Carrera_{carreraInfo.Año}.pdf";
+                    // Nombre para almacenar (con GUID para unicidad)
+                    string storageFileName = $"Reporte Carrera_{carreraInfo.Año}_{Guid.NewGuid()}.pdf";
+                    string filePath = Path.Combine(tempFolder, storageFileName);
                     System.IO.File.WriteAllBytes(filePath, ms.ToArray());
 
                     // Generar la URL de descarga y retornar el resultado
-                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName });
+                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName = storageFileName, downloadName = downloadFileName });
                     return Json(new { success = true, downloadUrl = downloadUrl });
                 }
             }

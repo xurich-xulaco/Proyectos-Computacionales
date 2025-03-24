@@ -210,6 +210,16 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
+    // Función para iniciar la descarga creando un enlace <a> dinámico
+    function iniciarDescarga(url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ''; // Se usará el nombre de archivo que indique el servidor en el header Content-Disposition.
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
     // Función única para obtener la lista de booleanos
     function obtenerListadeBooleanos() {
         var lista1 = [
@@ -319,7 +329,7 @@
                         title: "Éxito",
                         text: "El reporte se generó correctamente."
                     }).then(() => {
-                        window.open(response.downloadUrl, '_blank');
+                        iniciarDescarga(response.downloadUrl);
                         window.location.href = "/Home/Pantalla_ini";
                     });
                 } else {

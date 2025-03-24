@@ -15,13 +15,13 @@
 
     <form id="importar-tiempos-form" class="container">
             <h2>Importar tiempos desde Excel</h2>
-        <!-- Ruta del archivo -->
-        <div class="form-row">
-            <div class="form-group col-md-12">
-                <label for="rutaArchivo">Ruta del Archivo Excel <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="rutaArchivo" name="rutaArchivo" placeholder="Ejemplo: C:\archivos\tiempos.xlsx" required />
+            <!-- Archivo Excel -->
+            <div class="form-row">
+                <div class="form-group col-md-12">
+                    <label for="archivoExcel">Archivo Excel de Tiempos <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="archivoExcel" name="archivoExcel" required />
+                </div>
             </div>
-        </div>
 
         <!-- Selección de Carrera -->
         <div class="form-row">
@@ -57,10 +57,10 @@
 
         // Manejo del botón "Importar"
         $("#importar-btn").click(function () {
-            const rutaArchivo = $("#rutaArchivo").val();
+            const archivoExcel = $("#archivoExcel")[0].files[0];
             const carreraId = $("#CarreraId").val();
 
-            if (!rutaArchivo || !carreraId) {
+            if (!archivoExcel || !carreraId) {
                 Swal.fire({
                     icon: "warning",
                     title: "Campos incompletos",
@@ -69,28 +69,52 @@
                 return;
             }
 
-            $.post("/Home/Subir_ArchivoTiempos", { rutaArchivo, carreraId }, function (response) {
-                if (response.success) {
-                    Swal.fire({
-                        icon: "success",
-                        title: "Éxito",
-                        text: response.message,
-                    }).then(() => {
-                        window.location.href = "/Home/Pantalla_ini";
-                    });
-                } else {
+            const formData = new FormData();
+            formData.append("archivoExcel", archivoExcel);
+            formData.append("carreraId", carreraId);
+
+            // Mostrar pantalla de carga mientras se procesa la solicitud
+            Swal.fire({
+                title: 'Procesando...',
+                text: 'Por favor, espere mientras se procesa el archivo.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: "/Home/Subir_ArchivoTiempos",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    Swal.close();
+                    if (response.success) {
+                        Swal.fire({
+                            icon: "success",
+                            title: "Éxito",
+                            text: response.message,
+                        }).then(() => {
+                            window.location.href = "/Home/Pantalla_ini";
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: "error",
+                            title: "Error",
+                            text: response.message,
+                        });
+                    }
+                },
+                error: function (xhr, status, error) {
+                    Swal.close();
                     Swal.fire({
                         icon: "error",
-                        title: "Error",
-                        text: response.message,
+                        title: "Error en el servidor",
+                        text: `Error al procesar la solicitud: ${error}`,
                     });
                 }
-            }).fail(function (xhr, status, error) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Error en el servidor",
-                    text: `Error al procesar la solicitud: ${error}`,
-                });
             });
         });
     });

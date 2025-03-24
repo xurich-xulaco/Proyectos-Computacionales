@@ -188,6 +188,16 @@
     </div>
 
     <script>
+        // Función para iniciar la descarga creando un enlace <a> dinámico
+        function iniciarDescarga(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = ''; // Se usará el nombre de archivo que indique el servidor en el header Content-Disposition.
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
         $(document).ready(function () {
             // Evento para cargar las ediciones al cambiar el año
             $('#year').change(function () {
@@ -297,7 +307,7 @@
                                 text: 'El reporte se generó correctamente.',
                                 showConfirmButton: true
                             }).then(() => {
-                                window.open(data.downloadUrl, '_blank');
+                                iniciarDescarga(data.downloadUrl);
                                 window.location.href = '/Home/Pantalla_ini';
                             });
                         } else {
