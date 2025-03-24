@@ -52,9 +52,11 @@
     </div>
 
     <div class="col">
-        <button class="btn" style="background-color:#004A98; color: white; width: max-content;">
-            Mostrar base de datos
-        </button>
+        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionAdminsitradores" aria-expanded="false">Gestión de Administradores</button>
+        <ul class="dropdown-menu" aria-labelledby="gestionAdminsitradores">
+            <li><a class="dropdown-item" href="@Url.Action("Alta_administrador", "Home")">Nuevo Administrador</a></li>
+            <li><a class="dropdown-item" href="@Url.Action("Baja_adminsitrador", "Home")">Eliminar Administrador</a></li>
+        </ul>
     </div>
     <div class="col">
         <button class="btn" style="background-color:#004A98; color: white; width: max-content;">
