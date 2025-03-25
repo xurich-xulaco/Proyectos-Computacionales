@@ -255,16 +255,17 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
                     string query = @"
             WITH TiemposCorredor AS (
-                SELECT 
-                    folio_chip,
-                    tiempo_registrado,
-                    ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-                FROM dbo.Tiempo
+            SELECT 
+                folio_chip,
+                tiempo_registrado,
+                ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+            FROM dbo.Tiempo
             ),
             Posiciones AS (
                 SELECT 
                     RANK() OVER (ORDER BY 
-                        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00'))
+                        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
+                        v.num_corredor
                     ) AS Posicion,
                     v.num_corredor AS NumCorredor, 
                     c.nom_corredor AS Nombre,
@@ -277,7 +278,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 FROM CARRERA ca
                 JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
                 JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                JOIN Vincula_participante v ON cc.ID_carr_cat = v.ID_Carr_cat
+                JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
                 JOIN dbo.CORREDOR c ON v.ID_corredor = c.ID_corredor
                 LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
                 LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
@@ -291,8 +292,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             FROM Posiciones
             WHERE @NombreCorredor IS NULL 
                OR CONCAT(Nombre, ' ', ApellidoPaterno, ' ', ApellidoMaterno) LIKE @NombreCorredor
-            ORDER BY 
-                DATEDIFF(SECOND, 0, COALESCE(T4, '00:00:00'));";
+            ORDER BY Posicion;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -377,8 +377,10 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 string sql = @"
             SELECT DISTINCT ca.edi_carrera
             FROM CARRERA ca
+            INNER JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera
             WHERE ca.year_carrera = @YearCarrera
-            ORDER BY ca.edi_carrera";
+            ORDER BY ca.edi_carrera;
+            ";
 
                 using (SqlCommand command = new SqlCommand(sql, connection))
                 {
@@ -407,16 +409,14 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             {
                 await connection.OpenAsync();
                 string sql = @"
-            SELECT nombre_categoria
-            FROM (
-                SELECT DISTINCT cat.nombre_categoria,
-                    CAST(LEFT(cat.nombre_categoria, CHARINDEX(' ', cat.nombre_categoria) - 1) AS int) AS km
-                FROM CATEGORIA cat
-                INNER JOIN CARR_Cat cc ON cat.ID_categoria = cc.ID_categoria
-                INNER JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
-                WHERE ca.year_carrera = @YearCarrera AND ca.edi_carrera = @EdiCarrera
-            ) AS T
-            ORDER BY km";
+            SELECT DISTINCT cat.nombre_categoria,
+                CAST(LEFT(cat.nombre_categoria, CHARINDEX(' ', cat.nombre_categoria + ' ') - 1) AS int) AS km
+            FROM CATEGORIA cat
+            INNER JOIN CARR_Cat cc ON cat.ID_categoria = cc.ID_categoria
+            INNER JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+            WHERE ca.year_carrera = @YearCarrera AND ca.edi_carrera = @EdiCarrera
+            ORDER BY km;
+            ";
 
                 using (SqlCommand command = new SqlCommand(sql, connection))
                 {
@@ -2377,10 +2377,13 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
                             }
                         }
 
-                        // Si faltan tiempos, completar con un tiempo final de 5 horas
+                        // Si faltan tiempos, completar con un valor por defecto.
+                        // Por ejemplo, para T4 (último tiempo) se asigna 5 horas.
+                        // Puede ajustar los valores por defecto para T1, T2 y T3 si se requiere.
                         while (tiempos.Count < 4)
                         {
-                            tiempos.Add(TimeSpan.Zero);
+                            // Si se espera que el último tiempo sea T4, se asigna 5 horas
+                            tiempos.Add(TimeSpan.FromHours(5));
                         }
 
                         colaRegistros.Enqueue(new RegistroTiempo { FolioChip = folioChip, Tiempos = tiempos });

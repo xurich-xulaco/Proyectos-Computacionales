@@ -314,13 +314,15 @@
             const carreras = await response.json();
 
             const select = document.getElementById('carreraSeleccionada');
+            if (!select) {
+                console.error("El elemento con id 'carreraSeleccionada' no se encontró en el DOM.");
+                return;
+            }
 
-            // Verificar que 'carreras' es un array
             if (Array.isArray(carreras)) {
                 if (carreras.length === 0) {
-                        Swal.fire('Advertencia', 'No hay carreras disponibles o algunas no tienen categorías asignadas. Contacta al administrador.', 'warning');
+                    Swal.fire('Advertencia', 'No hay carreras disponibles o algunas no tienen categorías asignadas. Contacta al administrador.', 'warning');
                 }
-
                 carreras.forEach(carrera => {
                     const option = document.createElement('option');
                     option.value = carrera.Id;

@@ -285,21 +285,13 @@ SELECT
     ca.edi_carrera,
     (SELECT nombre_categoria FROM CATEGORIA WHERE ID_categoria = cc.ID_categoria) AS Categoria,
     RANK() OVER (ORDER BY 
-        (DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-         DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-         DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')) +
-         DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')))
+        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
+        v.num_corredor
     ) AS Posicion,
     COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
     COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
     COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-    CONVERT(TIME, DATEADD(SECOND, 
-        DATEDIFF(SECOND, 0, COALESCE(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, COALESCE(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, COALESCE(T3.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
-        0
-    )) AS TiempoTotal
+    COALESCE(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
 FROM CARRERA ca
 JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
 JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
@@ -728,14 +720,12 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')),
             v.num_corredor
         ) AS Posicion,
         v.num_corredor,
@@ -745,10 +735,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        CONVERT(TIME, DATEADD(SECOND, 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -757,6 +744,7 @@ Posiciones AS (
     LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
     LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
     LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE ca.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
 )
@@ -779,14 +767,12 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')),
             v.num_corredor
         ) AS Posicion,
         v.num_corredor,
@@ -796,10 +782,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        CONVERT(TIME, DATEADD(SECOND, 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -808,6 +791,7 @@ Posiciones AS (
     LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
     LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
     LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE ca.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'F'
@@ -831,14 +815,12 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 Posiciones AS (
     SELECT 
         RANK() OVER (ORDER BY 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))),
+            DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')),
             v.num_corredor
         ) AS Posicion,
         v.num_corredor,
@@ -848,10 +830,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        CONVERT(TIME, DATEADD(SECOND, 
-            (DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-             DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00'))), 0)) AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -860,6 +839,7 @@ Posiciones AS (
     LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
     LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
     LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE ca.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'M'
@@ -922,19 +902,15 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
 )
@@ -949,20 +925,16 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
     JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'F'
@@ -978,25 +950,21 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
     JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'M'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoHombres
+SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMujeres
 FROM TotalTiempos;";
                     break;
 
@@ -1029,19 +997,15 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
 )
@@ -1056,20 +1020,16 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
     JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'F'
@@ -1085,25 +1045,21 @@ WITH TiemposCorredor AS (
         folio_chip,
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
-    FROM dbo.Tiempo
+    FROM dbo.TIEMPO
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T1.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T2.tiempo_registrado, '00:00:00')) +
-        DATEDIFF(SECOND, 0, ISNULL(T3.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
     JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'M'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioHombres
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMujeres
 FROM TotalTiempos;";
                     break;
 
