@@ -291,7 +291,7 @@ SELECT
     COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
     COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
     COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-    COALESCE(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
+    COALESCE(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
 FROM CARRERA ca
 JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
 JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
@@ -315,19 +315,24 @@ WHERE
                 {
                     if (await reader.ReadAsync())
                     {
-                        // Mapear la información obtenida de la consulta a las propiedades del struct
+                        // Mapeo de información de la consulta
                         string nombreCarrera = reader["nom_carrera"].ToString();
                         string añoCarrera = reader["year_carrera"].ToString();
                         string edicionCarrera = reader["edi_carrera"].ToString();
                         string categoria = reader["Categoria"].ToString();
-                        // Convertir numCorredor a string, en caso de que se requiera en la estructura
                         string numCorredorStr = numCorredor.ToString();
-
                         string posicion = reader["Posicion"].ToString();
-                        string t1 = reader["T1"].ToString();
-                        string t2 = reader["T2"].ToString();
-                        string t3 = reader["T3"].ToString();
-                        string tfinal = reader["TiempoTotal"].ToString();
+
+                        // Conversión de los tiempos obtenidos a TimeSpan y formateo usando la función FormatearTiempo
+                        TimeSpan t1Time = (TimeSpan)reader["T1"];
+                        TimeSpan t2Time = (TimeSpan)reader["T2"];
+                        TimeSpan t3Time = (TimeSpan)reader["T3"];
+                        TimeSpan tFinalTime = (TimeSpan)reader["TiempoFinal"];
+
+                        string t1 = FormatearTiempo(t1Time);
+                        string t2 = FormatearTiempo(t2Time);
+                        string t3 = FormatearTiempo(t3Time);
+                        string tFinal = FormatearTiempo(tFinalTime);
 
                         carreraInfo = new ReporteCorredor_CarCatInfo(
                             nombreCarrera,
@@ -339,7 +344,7 @@ WHERE
                             t1,
                             t2,
                             t3,
-                            tfinal
+                            tFinal
                         );
                     }
                     else
@@ -552,7 +557,7 @@ WHERE
 
         private struct ReporteCarreras_Podio
         {
-            public ReporteCarreras_Podio (string NPosicion, string NumeroCorredor, string NombreCorredor, string Tiempo1, string Tiempo2, string Tiempo3, string TiempoTotal)
+            public ReporteCarreras_Podio (string NPosicion, string NumeroCorredor, string NombreCorredor, string Tiempo1, string Tiempo2, string Tiempo3, string TiempoFinal)
             {
                 posicion = NPosicion;
                 numero = NumeroCorredor;
@@ -560,7 +565,7 @@ WHERE
                 T1 = Tiempo1;
                 T2 = Tiempo2;
                 T3 = Tiempo3;
-                Ttotal = TiempoTotal;
+                Tfinal = TiempoFinal;
             }
 
             public string posicion { get; init; }
@@ -569,7 +574,7 @@ WHERE
             public string T1 { get; init; }
             public string T2 { get; init; }
             public string T3 { get; init; }
-            public string Ttotal { get; init; }
+            public string Tfinal { get; init; }
         }
         
 
@@ -735,7 +740,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -782,7 +787,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -830,7 +835,7 @@ Posiciones AS (
         ISNULL(T1.tiempo_registrado, '00:00:00') AS T1,
         ISNULL(T2.tiempo_registrado, '00:00:00') AS T2,
         ISNULL(T3.tiempo_registrado, '00:00:00') AS T3,
-        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoTotal
+        ISNULL(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
     FROM CARRERA ca
     JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -871,14 +876,26 @@ ORDER BY Posicion;";
                     while (await reader.ReadAsync())
                     {
                         string nombreCompleto = $"{reader["nom_corredor"]} {reader["apP_corredor"]} {reader["apM_corredor"]}";
+
+                        // Convertir los tiempos de la consulta a TimeSpan y formatearlos
+                        TimeSpan t1_preFormateado = (TimeSpan)reader["T1"];
+                        TimeSpan t2_preFormateado = (TimeSpan)reader["T2"];
+                        TimeSpan t3_preFormateado = (TimeSpan)reader["T3"];
+                        TimeSpan tFinal_preFormateado = (TimeSpan)reader["TiempoFinal"];
+
+                        string t1 = FormatearTiempo(t1_preFormateado);
+                        string t2 = FormatearTiempo(t2_preFormateado);
+                        string t3 = FormatearTiempo(t3_preFormateado);
+                        string tiempoFinal = FormatearTiempo(tFinal_preFormateado);
+
                         var reporte = new ReporteCarreras_Podio(
                             NPosicion: reader["Posicion"].ToString(),
                             NumeroCorredor: reader["num_corredor"].ToString(),
                             NombreCorredor: nombreCompleto,
-                            Tiempo1: reader["T1"].ToString(),
-                            Tiempo2: reader["T2"].ToString(),
-                            Tiempo3: reader["T3"].ToString(),
-                            TiempoTotal: reader["TiempoTotal"].ToString()
+                            Tiempo1: t1,
+                            Tiempo2: t2,
+                            Tiempo3: t3,
+                            TiempoFinal: tiempoFinal
                         );
                         ListaPodio.Enqueue(reporte);
                     }
@@ -890,7 +907,6 @@ ORDER BY Posicion;";
 
         private async Task<string> ReporteCarreras_ObtenerMenorTiempo(int IDcarrera, string categoria, short TipoDeSexo, SqlConnection connection)
         {
-            string MenorTiempo = "00:00:00";
             string TiempoQuery;
 
             switch (TipoDeSexo)
@@ -904,18 +920,23 @@ WITH TiemposCorredor AS (
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
     FROM dbo.TIEMPO
 ),
-TotalTiempos AS (
+SumaTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
-    FROM CARR_Cat cc
-    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
-    WHERE cc.ID_carrera = @carreraId
-      AND cat.nombre_categoria = @categoria
+         v.folio_chip,
+         SUM(DATEDIFF(SECOND, 0, t.tiempo_registrado)) AS TotalSegundos,
+         MAX(CASE WHEN t.NumTiempo = 4 THEN t.tiempo_registrado END) AS TiempoFinal
+    FROM Vincula_participante v
+    JOIN TiemposCorredor t ON v.folio_chip = t.folio_chip
+    GROUP BY v.folio_chip
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMixto
-FROM TotalTiempos;";
+SELECT TOP 1 TiempoFinal
+FROM CARR_Cat cc
+JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+JOIN SumaTiempos st ON v.folio_chip = st.folio_chip
+WHERE cc.ID_carrera = @carreraId
+  AND cat.nombre_categoria = @categoria
+ORDER BY st.TotalSegundos ASC;";
                     break;
 
                 case 1: // Mujeres
@@ -927,20 +948,25 @@ WITH TiemposCorredor AS (
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
     FROM dbo.TIEMPO
 ),
-TotalTiempos AS (
+SumaTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
-    FROM CARR_Cat cc
-    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
-    WHERE cc.ID_carrera = @carreraId
-      AND cat.nombre_categoria = @categoria
-      AND c.sex_corredor = 'F'
+         v.folio_chip,
+         SUM(DATEDIFF(SECOND, 0, t.tiempo_registrado)) AS TotalSegundos,
+         MAX(CASE WHEN t.NumTiempo = 4 THEN t.tiempo_registrado END) AS TiempoFinal
+    FROM Vincula_participante v
+    JOIN TiemposCorredor t ON v.folio_chip = t.folio_chip
+    GROUP BY v.folio_chip
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMujeres
-FROM TotalTiempos;";
+SELECT TOP 1 TiempoFinal
+FROM CARR_Cat cc
+JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+JOIN SumaTiempos st ON v.folio_chip = st.folio_chip
+WHERE cc.ID_carrera = @carreraId
+  AND cat.nombre_categoria = @categoria
+  AND c.sex_corredor = 'F'
+ORDER BY st.TotalSegundos ASC;";
                     break;
 
                 case 2: // Hombres
@@ -952,40 +978,52 @@ WITH TiemposCorredor AS (
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
     FROM dbo.TIEMPO
 ),
-TotalTiempos AS (
+SumaTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
-    FROM CARR_Cat cc
-    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-    JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
-    WHERE cc.ID_carrera = @carreraId
-      AND cat.nombre_categoria = @categoria
-      AND c.sex_corredor = 'M'
+         v.folio_chip,
+         SUM(DATEDIFF(SECOND, 0, t.tiempo_registrado)) AS TotalSegundos,
+         MAX(CASE WHEN t.NumTiempo = 4 THEN t.tiempo_registrado END) AS TiempoFinal
+    FROM Vincula_participante v
+    JOIN TiemposCorredor t ON v.folio_chip = t.folio_chip
+    GROUP BY v.folio_chip
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, MIN(TiempoTotalSegundos), 0)) AS MenorTiempoMujeres
-FROM TotalTiempos;";
+SELECT TOP 1 TiempoFinal
+FROM CARR_Cat cc
+JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+JOIN SumaTiempos st ON v.folio_chip = st.folio_chip
+WHERE cc.ID_carrera = @carreraId
+  AND cat.nombre_categoria = @categoria
+  AND c.sex_corredor = 'M'
+ORDER BY st.TotalSegundos ASC;";
                     break;
 
                 default:
-                    MenorTiempo = string.Empty;
                     _logger.LogWarning("No se eligió un sexo válido para consultas de menor tiempo en el reporte de la carrera.");
-                    return MenorTiempo;
+                    return string.Empty;
             }
+
             using (SqlCommand menorTiempoCmd = new SqlCommand(TiempoQuery, connection))
             {
                 menorTiempoCmd.Parameters.AddWithValue("@carreraId", IDcarrera);
                 menorTiempoCmd.Parameters.AddWithValue("@categoria", categoria);
-                MenorTiempo = (await menorTiempoCmd.ExecuteScalarAsync()).ToString();
+                // Leer el valor de TIME como TimeSpan y formatearlo.
+                object resultado = await menorTiempoCmd.ExecuteScalarAsync();
+                if (resultado != null && resultado != DBNull.Value)
+                {
+                    TimeSpan tiempo = (TimeSpan)resultado;
+                    return FormatearTiempo(tiempo);
+                }
+                else
+                {
+                    return "00:00:00.000";
+                }
             }
-
-            return MenorTiempo;
         }
 
         private async Task<string> ReporteCarreras_ObtenerTiempoPromedio(int IDcarrera, string categoria, short TipoDeSexo, SqlConnection connection)
         {
-            string TiempoPromedio = "00:00:00";
             string TiempoQuery;
 
             switch (TipoDeSexo)
@@ -1001,7 +1039,7 @@ WITH TiemposCorredor AS (
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoFinalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -1009,7 +1047,7 @@ TotalTiempos AS (
     WHERE cc.ID_carrera = @carreraId
       AND cat.nombre_categoria = @categoria
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMixto
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoFinalSegundos) AS INT), 0)) AS TiempoPromedioMixto
 FROM TotalTiempos;";
                     break;
 
@@ -1024,7 +1062,7 @@ WITH TiemposCorredor AS (
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoFinalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -1034,7 +1072,7 @@ TotalTiempos AS (
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'F'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMujeres
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoFinalSegundos) AS INT), 0)) AS TiempoPromedioMujeres
 FROM TotalTiempos;";
                     break;
 
@@ -1049,7 +1087,7 @@ WITH TiemposCorredor AS (
 ),
 TotalTiempos AS (
     SELECT 
-        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoTotalSegundos
+        DATEDIFF(SECOND, 0, ISNULL(T4.tiempo_registrado, '00:00:00')) AS TiempoFinalSegundos
     FROM CARR_Cat cc
     JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
@@ -1059,23 +1097,30 @@ TotalTiempos AS (
       AND cat.nombre_categoria = @categoria
       AND c.sex_corredor = 'M'
 )
-SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoTotalSegundos) AS INT), 0)) AS TiempoPromedioMujeres
+SELECT CONVERT(TIME, DATEADD(SECOND, CAST(AVG(TiempoFinalSegundos) AS INT), 0)) AS TiempoPromedioHombres
 FROM TotalTiempos;";
                     break;
 
                 default:
-                    TiempoPromedio = string.Empty;
                     _logger.LogWarning("No se eligió un sexo válido para consultas de tiempo promedio en el reporte de la carrera.");
-                    return TiempoPromedio;
+                    return "00:00:00.000";
             }
+
             using (SqlCommand TiempoPromedioCmd = new SqlCommand(TiempoQuery, connection))
             {
                 TiempoPromedioCmd.Parameters.AddWithValue("@carreraId", IDcarrera);
                 TiempoPromedioCmd.Parameters.AddWithValue("@categoria", categoria);
-                TiempoPromedio = (await TiempoPromedioCmd.ExecuteScalarAsync()).ToString();
+                object resultado = await TiempoPromedioCmd.ExecuteScalarAsync();
+                if (resultado != null && resultado != DBNull.Value)
+                {
+                    TimeSpan tiempoPromedio = (TimeSpan)resultado;
+                    return FormatearTiempo(tiempoPromedio);
+                }
+                else
+                {
+                    return "00:00:00.000";
+                }
             }
-
-            return TiempoPromedio;
         }
 
 
@@ -1341,7 +1386,7 @@ FROM TotalTiempos;";
                         };
 
                         // Encabezados de la tabla
-                        string[] headers = { "Posición", "Número", "Nombre", "Tiempo 1", "Tiempo 2", "Tiempo 3", "Tiempo Total" };
+                        string[] headers = { "Posición", "Número", "Nombre", "Tiempo 1", "Tiempo 2", "Tiempo 3", "Tiempo Final" };
                         foreach (string header in headers)
                         {
                             PdfPCell cell = new PdfPCell(new Phrase(header, normalFont))
@@ -1364,7 +1409,7 @@ FROM TotalTiempos;";
                             tabla.AddCell(new PdfPCell(new Phrase(podio.T1, normalFont)) { Padding = 5, BorderWidth = 0.5f });
                             tabla.AddCell(new PdfPCell(new Phrase(podio.T2, normalFont)) { Padding = 5, BorderWidth = 0.5f });
                             tabla.AddCell(new PdfPCell(new Phrase(podio.T3, normalFont)) { Padding = 5, BorderWidth = 0.5f });
-                            tabla.AddCell(new PdfPCell(new Phrase(podio.Ttotal, normalFont)) { Padding = 5, BorderWidth = 0.5f });
+                            tabla.AddCell(new PdfPCell(new Phrase(podio.Tfinal, normalFont)) { Padding = 5, BorderWidth = 0.5f });
                         }
                         pdfDoc.Add(tabla);
                     }
