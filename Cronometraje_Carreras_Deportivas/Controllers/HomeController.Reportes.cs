@@ -1214,6 +1214,7 @@ FROM TotalTiempos;";
                                                                        .ToList();
                         }
                         categorias = categoriasFiltradas.Select(x => x.Nombre).ToList();
+                        categorias.Reverse();
                     }
 
                     short cat_cont = 0;

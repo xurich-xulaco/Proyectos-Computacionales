@@ -2057,7 +2057,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                             {
                                 corredor["Nombre"] = reader.GetString(0);
                                 corredor["ApellidoPaterno"] = reader.GetString(1);
-                                corredor["ApellidoMaterno"] = reader.GetString(2);
+                                corredor["ApellidoMaterno"] = reader.IsDBNull(2) ? "" : reader.GetString(2);
                                 corredor["FechaNacimiento"] = reader.GetDateTime(3).ToString("yyyy-MM-dd");
                                 corredor["Sexo"] = reader.GetString(4);
                                 corredor["Pais"] = reader.GetString(5); // Cambiado para que coincida con el JavaScript
