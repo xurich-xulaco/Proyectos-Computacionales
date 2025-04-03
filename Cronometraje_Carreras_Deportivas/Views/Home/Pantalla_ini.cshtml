@@ -3,85 +3,103 @@
 @{
     ViewBag.Title = "Pantalla Inicial";
 }
-
-<nav class="navbar navbar-expand-sm header">
+<nav class="navbar navbar-expand-sm header" style="background-color:rgb(0, 51, 102)">
     <div class="container-fluid">
-        <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png" alt="Logo" style="max-width: 15%;">
-        <div class="rounded-pill">
-            <h4>@HttpContextAccessor.HttpContext.Session.GetString("Usuario")</h4>
-            <form asp-controller="Home" asp-action="Logout" method="post">
-                <button id="logoutButton" class="btn btn-outline-light">Cerrar sesión</button>
-            </form>
+        <!-- Logo -->
+        <a class="navbar-brand" href="#">
+            <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png"
+                 alt="Logo" style="max-width: 150px; height: auto;">
+        </a>
+
+        <!-- Botón para móviles con color blanco -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                style="border-color: white;">
+            <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+        </button>
+
+        <!-- Contenido colapsable -->
+        <div class="collapse navbar-collapse justify-content-end" id="navbarContent">
+            <div class="d-flex align-items-center gap-3">
+                <h4 class="text-white m-0">@HttpContextAccessor.HttpContext.Session.GetString("Usuario")</h4>
+                <form asp-controller="Home" asp-action="Logout" method="post">
+                    <button id="logoutButton" class="btn btn-outline-light">Cerrar sesión</button>
+                </form>
+            </div>
         </div>
     </div>
 </nav>
-<div class="row" style="background-color:#004A98;">
-    <div class="col"></div>
 
-    <!--Gestión de corredores-->
-    <div class="col">
-        <div class="dropdown">
-            <button type="button" class="btn dropdown-toggle" style="background-color:#004A98; color: white; width: max-content;" data-bs-toggle="dropdown" id="gestionCorredor" aria-expanded="false">
-                Gestión de corredores
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="gestionCorredor">
-                <li><a class="dropdown-item" href="@Url.Action("Crear_Corredor", "Home")">Nuevo Corredor</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Eliminar_Corredor", "Home")">Eliminar Corredor</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Modificar_Corredor", "Home")">Modificar Corredor</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Importar_Corredores", "Home")">Importar corredores</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Importar_tiempos", "Home")">Importar tiempos</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Exportar_corredor", "Home")">Exportar Corredor</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Reporte_corredor", "Home")">Reporte de Corredor</a></li>
+<nav class="navbar navbar-expand-lg" style="background-color: rgb(0, 51, 102);">
+    <div class="container-fluid">
+        <!-- Contenido del menú -->
+        <div class="navbar-collapse justify-content-center" id="navbarNav">
+            <ul class="navbar-nav d-flex flex-wrap gap-lg-3 gap-1">
+                <!-- Gestión de corredores -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown"
+                       style="background-color:#004A98; padding: 10px; border-radius: 5px;">
+                        Gestión de corredores
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Crear_Corredor">Nuevo Corredor</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Importar_Corredores">Importar corredores</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Importar_tiempos">Importar tiempos</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Exportar_corredor">Exportar Corredor</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Reporte_corredor">Reporte de Corredor</a></li>
+                    </ul>
+                </li>
+
+                <!-- Gestión de carreras -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown"
+                       style="background-color:#004A98; padding: 10px; border-radius: 5px;">
+                        Gestión de carreras
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Crear_Carrera">Nueva Carrera</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Eliminar_Carrera">Eliminar Carrera</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Editar_Carrera">Editar Carrera</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Reporte_carrera">Generar reporte de carrera</a></li>
+                    </ul>
+                </li>
+
+                <!-- Gestión de Administradores -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown"
+                       style="background-color:#004A98; padding: 10px; border-radius: 5px;">
+                        Gestión de Administradores
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Alta_administrador">Nuevo Administrador</a></li>
+                        <li><a class="dropdown-item" asp-controller="Home" asp-action="Baja_administrador">Eliminar Administrador</a></li>
+                    </ul>
+                </li>
+
+                <!-- Botón de exportar resultados -->
+                <li class="nav-item">
+                    <a class="nav-link text-white" asp-controller="Home" asp-action="Exportar_Resultados"
+                       style="background-color:#004A98; padding: 10px; border-radius: 5px;">
+                        Exportar resultados
+                    </a>
+                </li>
             </ul>
         </div>
     </div>
-
-    <!--Gestión de carreras-->
-    <div class="col">
-        <div class="dropdown">
-            <button type="button" class="btn dropdown-toggle" style="background-color:#004A98; color: white; width: max-content;" data-bs-toggle="dropdown" id="gestionCarreras" aria-expanded="false">
-                Gestión de carreras
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="gestionCarreras">
-                <li><a class="dropdown-item" href="@Url.Action("Crear_Carrera", "Home")">Nueva Carrera</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Eliminar_Carrera", "Home")">Eliminar Carrera</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Editar_Carrera", "Home")">Editar Carrera</a></li>
-                <li><a class="dropdown-item" href="@Url.Action("Reporte_carrera", "Home")">Generar reporte de carrera</a></li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="col">
-        <button type="button" class="btn  dropdown-toggle" style="background-color:#004A98 ;color: white;width:max-content;" data-bs-toggle="dropdown" id="gestionAdminsitradores" aria-expanded="false">Gestión de Administradores</button>
-        <ul class="dropdown-menu" aria-labelledby="gestionAdminsitradores">
-            <li><a class="dropdown-item" href="@Url.Action("Alta_administrador", "Home")">Nuevo Administrador</a></li>
-            <li><a class="dropdown-item" href="@Url.Action("Baja_adminsitrador", "Home")">Eliminar Administrador</a></li>
-        </ul>
-    </div>
-    <div class="col">
-        <button class="btn" style="background-color:#004A98; color: white; width: max-content;">
-            Exportar resultados
-        </button>
-    </div>
-    <div class="col"></div>
-</div>
-
+</nav>
 
 <br>
-
-<div>
+<div class="container-fluid">
     <form id="searchForm" method="post" asp-action="BuscarCorredores">
-        <div class="row align-items-center">
-            <div class="col-1"></div> <!-- Espaciado a la izquierda -->
+        <div class="row gx-3 gy-2 align-items-center">
             <!-- Nombre del Corredor -->
-            <div class="col">
+            <div class="col-12 col-md">
                 <label for="nombreCorredor" class="form-label"><strong>Nombre del Corredor:</strong></label>
                 <input type="text" name="nombreCorredor" id="nombreCorredor" class="form-control"
                        value="@ViewBag.NombreBuscado" placeholder="Nombre del corredor" />
             </div>
 
             <!-- Año -->
-            <div class="col">
+            <div class="col-12 col-md">
                 <label for="yearCarrera" class="form-label"><strong>Año:</strong></label>
                 <select id="yearCarrera" name="yearCarrera" class="form-control">
                     <option value="">Seleccione un año</option>
@@ -94,7 +112,7 @@
             </div>
 
             <!-- Edición -->
-            <div class="col">
+            <div class="col-12 col-md">
                 <label for="ediCarrera" class="form-label"><strong>Edición:</strong></label>
                 <select id="ediCarrera" name="ediCarrera" class="form-control">
                     <option value="">Seleccione una edición</option>
@@ -106,7 +124,7 @@
             </div>
 
             <!-- Categoría -->
-            <div class="col">
+            <div class="col-12 col-md">
                 <label for="categoria" class="form-label"><strong>Categoría:</strong></label>
                 <select id="categoria" name="categoria" class="form-control">
                     <option value="">Seleccione una categoría</option>
@@ -118,86 +136,87 @@
             </div>
 
             <!-- Botón de Búsqueda -->
-            <div class="col">
-                <button type="submit" class="btn btn-primary">Buscar</button>
+            <div class="col-12 col-md-auto">
+                <button type="submit" class="btn btn-primary w-100">Buscar</button>
             </div>
         </div>
     </form>
 
-
+    @if (!string.IsNullOrEmpty(ViewBag.Error))
+    {
+        <div class="alert alert-danger mt-3">@ViewBag.Error</div>
+    }
 </div>
-@if (!string.IsNullOrEmpty(ViewBag.Error))
-{
-    <div class="alert alert-danger">@ViewBag.Error</div>
-}
 
 
-<div class="row">
-    <!-- Tabla de resultados (ocupa la mitad de la pantalla) -->
-   
-        <div id="resultTable" class="mt-4" style=" margin: auto;">
+<div class="container-fluid">
+    <div class="row">
+        <div id="resultTable" class="mt-4 mx-auto col-12">
+            <div class="table-responsive">
+                <table class="table table-primary table-striped table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Posición</th>
+                            <th>Número</th>
+                            <th>Nombre</th>
+                            <th>T1</th>
+                            <th>T2</th>
+                            <th>T3</th>
+                            <th>Tiempo Total</th>
+                            <th>Opciones</th>
+                        </tr>
+                    </thead>
+                    @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
+                    {
+                        <tbody class="table-group-divider">
+                            @foreach (var corredor in ViewBag.ResultadosBusqueda)
+                            {
+                                <tr>
+                                    <td>@corredor["Posicion"]</td>
+                                    <td>@corredor["NumCorredor"]</td>
+                                    <td>@corredor["Nombre"]</td>
+                                    <td>@corredor["T1"]</td>
+                                    <td>@corredor["T2"]</td>
+                                    <td>@corredor["T3"]</td>
+                                    <td>@corredor["T4"]</td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger eliminar-corredor"
+                                                data-year="@ViewBag.SelectedYear"
+                                                data-edition="@ViewBag.SelectedEdition"
+                                                data-category="@ViewBag.SelectedCategory"
+                                                data-numcorredor="@corredor["NumCorredor"]">
+                                            Eliminar
+                                        </button>
 
-            <table class="table table-primary table-striped table-bordered">
-                <thead>
-                    <tr>
-                        <th>Posición</th>
-                        <th>Número</th>
-                        <th>Nombre</th>
-                        <th>T1</th>
-                        <th>T2</th>
-                        <th>T3</th>
-                        <th>Tiempo Total</th>
-                        <th>Opciones</th>
-                    </tr>
-                </thead>
-                @if (ViewBag.ResultadosBusqueda != null && ViewBag.ResultadosBusqueda.Count > 0)
-                {
-                    <tbody class="table-group-divider">
-                        @foreach (var corredor in ViewBag.ResultadosBusqueda)
-                        {
-                           
-                            <tr>
-                                <td>@corredor["Posicion"]</td>
-                                <td>@corredor["NumCorredor"]</td>
-                                <td>@corredor["Nombre"]</td>
-                                <td>@corredor["T1"]</td>
-                                <td>@corredor["T2"]</td>
-                                <td>@corredor["T3"]</td>
-                                <td>@corredor["T4"]</td>
-                            <td>
-                                <button type="button" class="btn btn-danger eliminar-corredor"
-                                        data-year="@ViewBag.SelectedYear"
-                                        data-edition="@ViewBag.SelectedEdition"
-                                        data-category="@ViewBag.SelectedCategory"
-                                        data-numcorredor="@corredor["NumCorredor"]">
-                                    Eliminar
-                                </button>
-
-
-                                <button type="button" class="btn btn-warning modificar-corredor"
-                                        data-year="@ViewBag.SelectedYear"
-                                        data-edition="@ViewBag.SelectedEdition"
-                                        data-category="@ViewBag.SelectedCategory"
-                                        data-numcorredor="@corredor["NumCorredor"]">
-                                    Modificar
-                                </button>
-                            </td>
-                            </tr>
-                            
-                            
-                        }
+                                        <button type="button" class="btn btn-warning modificar-corredor"
+                                                data-year="@ViewBag.SelectedYear"
+                                                data-edition="@ViewBag.SelectedEdition"
+                                                data-category="@ViewBag.SelectedCategory"
+                                                data-numcorredor="@corredor["NumCorredor"]">
+                                            Modificar
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
                         </tbody>
-                }
-                else if (ViewBag.ResultadosBusqueda != null)
-                {
-                    <p>No se encontraron resultados para los criterios de búsqueda.</p>
-                }
-            </table>
-
+                    }
+                    else if (ViewBag.ResultadosBusqueda != null)
+                    {
+                        <tbody>
+                            <tr>
+                                <td colspan="8" class="text-center">No se encontraron resultados para los criterios de búsqueda.</td>
+                            </tr>
+                        </tbody>
+                    }
+                </table>
+            </div>
         </div>
     </div>
+</div>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>    
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
