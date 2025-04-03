@@ -1,0 +1,102 @@
+﻿@{
+    ViewData["Title"] = "Modificar Corredor";
+}
+
+<nav class="navbar navbar-expand-sm header" style="background-color:rgb(0, 51, 102)">
+    <div class="container-fluid">
+        <!-- Logo -->
+        <a class="navbar-brand" href="/Home/Pantalla_ini">
+            <img src="https://wp.uaslp.mx/informe/wp-content/uploads/sites/2/2024/04/UASLP.png"
+                 alt="Logo" style="max-width: 150px; height: auto;">
+        </a>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h2 class="text-center">Modificar Corredor</h2>
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <form id="modificarCorredorForm" method="post" action="/Home/ActualizarCorredor">
+                <input type="hidden" name="year" value="@ViewBag.Year" />
+                <input type="hidden" name="edition" value="@ViewBag.Edition" />
+                <input type="hidden" name="category" value="@ViewBag.Category" />
+                <input type="hidden" name="numCorredor" value="@ViewBag.NumCorredor" />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label>Nombre:</label>
+                            <input type="text" name="nombre" class="form-control" value="@ViewBag.Corredor["Nombre"]" required />
+                        </div>
+                        <div class="mb-3">
+                            <label>Apellido Paterno:</label>
+                            <input type="text" name="apellidoPaterno" class="form-control" value="@ViewBag.Corredor["ApellidoPaterno"]" required />
+                        </div>
+                        <div class="mb-3">
+                            <label>Apellido Materno:</label>
+                            <input type="text" name="apellidoMaterno" class="form-control" value="@ViewBag.Corredor["ApellidoMaterno"]" />
+                        </div>
+                        <div class="mb-3">
+                            <label>Fecha de Nacimiento:</label>
+                            <input type="date" name="fechaNacimiento" class="form-control" value="@ViewBag.Corredor["FechaNacimiento"]" required />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label>Sexo:</label>
+                            <select name="sexo" class="form-control">
+                                <option value="M" selected="@(ViewBag.Corredor["Sexo"] == "M")">Masculino</option>
+                                <option value="F" selected="@(ViewBag.Corredor["Sexo"] == "F")">Femenino</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>País:</label>
+                            <input type="text" name="pais" class="form-control" value="@ViewBag.Corredor["Pais"]" required />
+                        </div>
+                        <div class="mb-3">
+                            <label>Correo:</label>
+                            <input type="email" name="correo" class="form-control" value="@ViewBag.Corredor["Correo"]" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="/Home/Pantalla_ini" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $('#modificarCorredorForm').on('submit', function (e) {
+            e.preventDefault();
+
+            Swal.fire({
+                title: 'Confirmar cambios',
+                text: "¿Estás seguro de que deseas modificar la información del corredor?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, modificar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post('/Home/ActualizarCorredor', $(this).serialize())
+                        .done(function (data) {
+                            if (data.success) {
+                                Swal.fire('¡Actualizado!', data.message, 'success').then(() => {
+                                    window.location.href = '/Home/Pantalla_ini';
+                                });
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        });
+                }
+            });
+        });
+    </script>
+}
