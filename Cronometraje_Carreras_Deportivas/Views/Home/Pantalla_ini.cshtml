@@ -77,10 +77,10 @@
 
                 <!-- Botón de exportar resultados -->
                 <li class="nav-item">
-                    <a class="nav-link text-white" asp-controller="Home" asp-action="Exportar_Resultados"
-                       style="background-color:#004A98; padding: 10px; border-radius: 5px;">
+                    <button id="exportarExcel" class="btn text-white w-100 w-md-auto text-start"
+                            style="background-color:#004A98; padding: 10px; border-radius: 5px;">
                         Exportar resultados
-                    </a>
+                    </button>
                 </li>
             </ul>
         </div>
@@ -340,6 +340,89 @@
 
                 const url = `/Home/Modificar_Corredor?year=${year}&edition=${edition}&category=${category}&numcorredor=${numCorredor}`;
                 window.location.href = url;
+            });
+        });
+    });
+</script>
+
+<script>
+    // Función para iniciar la descarga creando un enlace <a> dinámico
+    function iniciarDescarga(url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ''; // Se usará el nombre indicado en el header Content-Disposition
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    $(document).ready(function () {
+        // Evento para exportar Excel
+        $('#exportarExcel').click(function () {
+            var yearCarrera = $('#yearCarrera').val();
+            var ediCarrera = $('#ediCarrera').val();
+            var categoria = $('#categoria').val();
+
+            // Validación de campos obligatorios
+            if (!yearCarrera || !ediCarrera || !categoria) {
+                Swal.fire('Error', 'Por favor, completa todos los campos requeridos (año, edición y categoría).', 'error');
+                return;
+            }
+
+            // Verificar si hay corredores en pantalla
+            if ($('#resultTable tbody tr').length === 0) {
+                Swal.fire('Error', 'Actualmente no hay corredores para exportar.', 'error');
+                return;
+            }
+
+            // Confirmación para evitar clic accidental
+            Swal.fire({
+                title: '¿Generar Excel?',
+                text: '¿Deseas generar el archivo Excel con los resultados?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, generar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    var nombreCorredor = $('#nombreCorredor').val() || '';
+
+                    // Mostrar SweetAlert de carga
+                    Swal.fire({
+                        title: 'Generando Excel...',
+                        text: 'Por favor espera mientras se genera el archivo.',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Llamada GET a la acción ExportarResultadosExcel
+                    $.get('/Home/ExportarResultadosExcel', {
+                        yearCarrera: yearCarrera,
+                        ediCarrera: ediCarrera,
+                        categoria: categoria,
+                        nombreCorredor: nombreCorredor
+                    })
+                    .done(function (data) {
+                        Swal.close();
+                        if (data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Excel generado!',
+                                text: 'El archivo Excel se generó correctamente.'
+                            }).then(() => {
+                                iniciarDescarga(data.downloadUrl);
+                            });
+                        } else {
+                            Swal.fire('Error', data.message, 'error');
+                        }
+                    })
+                    .fail(function () {
+                        Swal.close();
+                        Swal.fire('Error', 'No se pudo generar el Excel. Verifica tu conexión.', 'error');
+                    });
+                }
             });
         });
     });

@@ -2832,5 +2832,148 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
             return View();
         }
 
+        private async Task<List<Dictionary<string, object>>> ObtenerResultadosBusqueda(int yearCarrera, int ediCarrera, string categoria, string nombreCorredor = null)
+        {
+            var resultados = new List<Dictionary<string, object>>();
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+                string query = @"
+            WITH TiemposCorredor AS (
+                SELECT 
+                    folio_chip,
+                    tiempo_registrado,
+                    ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
+                FROM dbo.Tiempo
+            ),
+            Posiciones AS (
+                SELECT 
+                    RANK() OVER (ORDER BY 
+                        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
+                        v.num_corredor
+                    ) AS Posición,
+                    v.num_corredor AS [N° Corredor], 
+                    c.nom_corredor AS Nombre,
+                    COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+                    COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+                    COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+                    COALESCE(T4.tiempo_registrado, '00:00:00') AS [T Final]
+                FROM CARRERA ca
+                JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+                JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+                LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+                LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+                LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+                LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
+                WHERE ca.year_carrera = @YearCarrera
+                  AND ca.edi_carrera = @EdiCarrera
+                  AND cat.nombre_categoria = @Categoria
+            )
+            SELECT Posición, [N° Corredor], Nombre, T1, T2, T3, [T Final]
+            FROM Posiciones
+            WHERE @NombreCorredor IS NULL 
+               OR CONCAT(Nombre, ' ', Nombre) LIKE @NombreCorredor
+            ORDER BY Posición;";
+
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@YearCarrera", yearCarrera);
+                    command.Parameters.AddWithValue("@EdiCarrera", ediCarrera);
+                    command.Parameters.AddWithValue("@Categoria", categoria);
+                    command.Parameters.AddWithValue("@NombreCorredor",
+                        string.IsNullOrEmpty(nombreCorredor) ? DBNull.Value : (object)$"%{nombreCorredor}%");
+
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var fila = new Dictionary<string, object>
+                    {
+                        { "Posición", reader.GetInt64(0) },
+                        { "N° Corredor", reader.GetInt32(1) },
+                        { "Nombre", reader.GetString(2) },
+                        { "T1", reader.IsDBNull(3) ? "N/A" : reader.GetTimeSpan(3).ToString() },
+                        { "T2", reader.IsDBNull(4) ? "N/A" : reader.GetTimeSpan(4).ToString() },
+                        { "T3", reader.IsDBNull(5) ? "N/A" : reader.GetTimeSpan(5).ToString() },
+                        { "T Final", reader.IsDBNull(6) ? "N/A" : reader.GetTimeSpan(6).ToString() }
+                    };
+                            resultados.Add(fila);
+                        }
+                    }
+                }
+            }
+            return resultados;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportarResultadosExcel(int yearCarrera, int ediCarrera, string categoria, string nombreCorredor = null)
+        {
+            List<Dictionary<string, object>> resultados;
+            // Ejecutar la consulta SQL para obtener los datos
+            try
+            {
+                resultados = await ObtenerResultadosBusqueda(yearCarrera, ediCarrera, categoria, nombreCorredor);
+            }
+            catch (Exception ex_sql)
+            {
+                _logger.LogError(ex_sql, "Error al ejecutar la consulta SQL para exportación a Excel.");
+                return Json(new { success = false, message = "Ocurrió un error al obtener los datos de la base de datos." });
+            }
+
+            // Crear el archivo Excel con ClosedXML y guardarlo en una carpeta temporal
+            try
+            {
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("Resultados");
+
+                    // Definir las cabeceras
+                    var cabeceras = new List<string> { "Posición", "N° Corredor", "Nombre", "T1", "T2", "T3", "T Final" };
+                    for (int i = 0; i < cabeceras.Count; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = cabeceras[i];
+                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+                    }
+
+                    // Llenar el Excel con los datos obtenidos
+                    int filaActual = 2;
+                    foreach (var fila in resultados)
+                    {
+                        int columnaActual = 1;
+                        foreach (var cabecera in cabeceras)
+                        {
+                            worksheet.Cell(filaActual, columnaActual).Value = fila[cabecera]?.ToString() ?? "";
+                            columnaActual++;
+                        }
+                        filaActual++;
+                    }
+
+                    // Ajustar el ancho de las columnas
+                    worksheet.Columns().AdjustToContents();
+
+                    // Guardar el archivo en una carpeta temporal
+                    string tempFolder = Path.Combine(Path.GetTempPath(), "ReportesCronos");
+                    if (!Directory.Exists(tempFolder))
+                        Directory.CreateDirectory(tempFolder);
+                    string fileName = $"Exportacion_{Guid.NewGuid()}.xlsx";
+                    string filePath = Path.Combine(tempFolder, fileName);
+                    workbook.SaveAs(filePath);
+
+                    // Generar la URL de descarga usando el mismo patrón de DownloadReporte
+                    string downloadUrl = Url.Action("DownloadReporte", "Home", new { fileName = fileName, downloadName = "Resultados.xlsx" });
+                    return Json(new { success = true, downloadUrl = downloadUrl });
+                }
+            }
+            catch (Exception ex_excel)
+            {
+                _logger.LogError(ex_excel, "Error al crear el archivo Excel.");
+                return Json(new { success = false, message = "Ocurrió un error al generar el archivo Excel." });
+            }
+        }
+
     }
 }

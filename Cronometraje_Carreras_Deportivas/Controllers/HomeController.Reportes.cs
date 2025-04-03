@@ -106,6 +106,19 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     return NotFound("El archivo no existe o ya fue descargado.");
                 }
 
+                // Determinar la extensión y asegurarse de que solo sea PDF o XLSX
+                string extension = Path.GetExtension(fileName).ToLowerInvariant();
+                if (extension != ".pdf" && extension != ".xlsx")
+                {
+                    _logger.LogError("Tipo de archivo no soportado: {Extension}", extension);
+                    return BadRequest("Solo se permiten archivos PDF y Excel (.xlsx).");
+                }
+
+                // Asignar el Content-Type correspondiente
+                string contentType = extension == ".pdf"
+                                     ? "application/pdf"
+                                     : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
                 byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
 
                 // Opcional: si el crash ocurre al eliminar, comenta la siguiente línea
@@ -122,8 +135,8 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
                 _logger.LogInformation("Link de descarga completamente generado.");
                 // Si downloadName se suministra, se usa para la descarga; de lo contrario, se usa el nombre almacenado.
-                string finalDownloadName = string.IsNullOrWhiteSpace(downloadName) ? "Reporte.pdf" : downloadName;
-                return File(fileBytes, "application/pdf", finalDownloadName);
+                string finalDownloadName = string.IsNullOrWhiteSpace(downloadName) ? fileName : downloadName;
+                return File(fileBytes, contentType, finalDownloadName);
             }
             catch (Exception ex)
             {
