@@ -205,7 +205,8 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     if (await reader.ReadAsync())
                     {
                         // Construir el nombre completo
-                        string nombreCompleto = $"{reader.GetString(0)} {reader.GetString(1)} {reader.GetString(2)}";
+                        string apellidoMaterno = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                        string nombreCompleto = $"{reader.GetString(0)} {reader.GetString(1)} {apellidoMaterno}";
                         // Formatear la fecha de nacimiento
                         string fecha = reader.GetDateTime(3).ToString("yyyy-MM-dd");
                         // Obtener el primer carácter del sexo
