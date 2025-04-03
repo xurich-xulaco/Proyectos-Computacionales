@@ -83,6 +83,13 @@
                                         // Redirigir a la pantalla inicial
                                         window.location.href = '/Home/Pantalla_ini';
                                     });
+                                } else {
+                                    // Manejar el caso en que la eliminación no fue exitosa
+                                    Swal.fire({
+                                        icon: 'warning',
+                                        title: 'Advertencia',
+                                        text: response.message,
+                                    });
                                 }
                             },
                             error: function () {

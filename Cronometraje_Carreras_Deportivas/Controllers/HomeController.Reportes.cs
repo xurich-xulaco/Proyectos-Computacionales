@@ -278,31 +278,47 @@ WITH TiemposCorredor AS (
         tiempo_registrado,
         ROW_NUMBER() OVER (PARTITION BY folio_chip ORDER BY tiempo_registrado) AS NumTiempo
     FROM dbo.TIEMPO
+),
+Ranking AS (
+    SELECT 
+        ca.nom_carrera,
+        ca.year_carrera,
+        ca.edi_carrera,
+        cc.ID_categoria,
+        v.num_corredor,
+        (SELECT nombre_categoria FROM CATEGORIA WHERE ID_categoria = cc.ID_categoria) AS Categoria,
+        RANK() OVER (
+            ORDER BY DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')), 
+                     v.num_corredor
+        ) AS Posicion,
+        COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
+        COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
+        COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
+        COALESCE(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
+    FROM CARRERA ca
+    JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
+    JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+    LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
+    LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
+    LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
+    LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
+    WHERE 
+        ca.ID_carrera = @idCarrera
+        AND cc.ID_categoria = @idCategoria
 )
 SELECT 
-    ca.nom_carrera,
-    ca.year_carrera,
-    ca.edi_carrera,
-    (SELECT nombre_categoria FROM CATEGORIA WHERE ID_categoria = cc.ID_categoria) AS Categoria,
-    RANK() OVER (ORDER BY 
-        DATEDIFF(SECOND, 0, COALESCE(T4.tiempo_registrado, '00:00:00')),
-        v.num_corredor
-    ) AS Posicion,
-    COALESCE(T1.tiempo_registrado, '00:00:00') AS T1,
-    COALESCE(T2.tiempo_registrado, '00:00:00') AS T2,
-    COALESCE(T3.tiempo_registrado, '00:00:00') AS T3,
-    COALESCE(T4.tiempo_registrado, '00:00:00') AS TiempoFinal
-FROM CARRERA ca
-JOIN CARR_Cat cc ON ca.ID_carrera = cc.ID_carrera  
-JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-LEFT JOIN TiemposCorredor T1 ON v.folio_chip = T1.folio_chip AND T1.NumTiempo = 1
-LEFT JOIN TiemposCorredor T2 ON v.folio_chip = T2.folio_chip AND T2.NumTiempo = 2
-LEFT JOIN TiemposCorredor T3 ON v.folio_chip = T3.folio_chip AND T3.NumTiempo = 3
-LEFT JOIN TiemposCorredor T4 ON v.folio_chip = T4.folio_chip AND T4.NumTiempo = 4
-WHERE 
-    ca.ID_carrera = @idCarrera
-    AND cc.ID_categoria = @idCategoria
-    AND v.num_corredor = @numCorredor;
+    nom_carrera,
+    year_carrera,
+    edi_carrera,
+    Categoria,
+    num_corredor,
+    Posicion,
+    T1,
+    T2,
+    T3,
+    TiempoFinal
+FROM Ranking
+WHERE num_corredor = @numCorredor;
 ";
 
             using (SqlCommand command = new SqlCommand(queryTiempos, connection))
@@ -475,7 +491,7 @@ WHERE
                     // Tabla para la información de cada carrera
                     PdfPTable carrerasTable = new PdfPTable(10) { WidthPercentage = 100 };
                     carrerasTable.SetWidths(new float[] { 12, 10, 8, 10, 8, 6, 11, 11, 11, 12 });
-                    string[] tableHeaders = { "Carr.", "Año", "Ed.", "Cat.", "N° Corr.", "Pos.", "T1", "T2", "T3", "T.Total" };
+                    string[] tableHeaders = { "Carr.", "Año", "Ed.", "Cat.", "N° Corr.", "Pos.", "T1", "T2", "T3", "T.Final" };
                     foreach (string header in tableHeaders)
                     {
                         PdfPCell cell = new PdfPCell(new Phrase(header, labelFont))
@@ -637,73 +653,35 @@ WHERE
         }
 
 
-        private async Task<int> ReporteCarreras_TodosLosHombres(int IDCarrera, string categoria, SqlConnection connection)
+        private async Task<(int TotalHombres, int TotalMujeres)> ReporteCarreras_ConteoPorSexo(int IDCarrera, string categoria, SqlConnection connection)
         {
-            int hombres = 0;
-
-            string totalHombresQuery = @"
-                        SELECT COUNT(*) 
-                        FROM CARR_Cat cc
-                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-                        JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                        WHERE cc.ID_carrera = @carreraId
-                          AND cat.nombre_categoria = @categoria
-                          AND c.sex_corredor = 'M';";
-            using (SqlCommand hombresCmd = new SqlCommand(totalHombresQuery, connection))
+            string query = @"
+                SELECT
+                SUM(CASE WHEN c.sex_corredor = 'M' THEN 1 ELSE 0 END) AS TotalHombres,
+                SUM(CASE WHEN c.sex_corredor = 'F' THEN 1 ELSE 0 END) AS TotalMujeres
+                FROM CARR_Cat cc
+                JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
+                JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
+                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                WHERE cc.ID_carrera = @carreraId
+                    AND cat.nombre_categoria = @categoria;";
+            using (SqlCommand cmd = new SqlCommand(query, connection))
             {
-                hombresCmd.Parameters.AddWithValue("@carreraId", IDCarrera);
-                hombresCmd.Parameters.AddWithValue("@categoria", categoria);
-                hombres = (int)await hombresCmd.ExecuteScalarAsync();
+                cmd.Parameters.AddWithValue("@carreraId", IDCarrera);
+                cmd.Parameters.AddWithValue("@categoria", categoria);
+                
+                using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        int totalHombres = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+                        int totalMujeres = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                        return (totalHombres, totalMujeres);
+                    }
+                }
             }
-
-            return hombres;
-        }
-
-
-        private async Task<int> ReporteCarreras_TodasLasMujeres(int IDCarrera, string categoria, SqlConnection connection)
-        {
-            int mujeres = 0;
-
-            string totalMujeresQuery = @"
-                        SELECT COUNT(*) 
-                        FROM CARR_Cat cc
-                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-                        JOIN CORREDOR c ON v.ID_corredor = c.ID_corredor
-                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                        WHERE cc.ID_carrera = @carreraId
-                          AND cat.nombre_categoria = @categoria
-                          AND c.sex_corredor = 'F';";
-            using (SqlCommand mujeresCmd = new SqlCommand(totalMujeresQuery, connection))
-            {
-                mujeresCmd.Parameters.AddWithValue("@carreraId", IDCarrera);
-                mujeresCmd.Parameters.AddWithValue("@categoria", categoria);
-                mujeres = (int)await mujeresCmd.ExecuteScalarAsync();
-            }
-
-            return mujeres;
-        }
-
-
-        private async Task<int> ReporteCarreras_VerificarParticipantes(int IDCarrera, string categoria, SqlConnection connection)
-        {
-            int participantes = 0;
-
-            string verificarParticipantesQuery = @"
-                        SELECT COUNT(*) AS Participantes
-                        FROM CARR_Cat cc
-                        JOIN Vincula_participante v ON cc.ID_Carr_cat = v.ID_Carr_cat
-                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                        WHERE cc.ID_carrera = @carreraId
-                          AND cat.nombre_categoria = @categoria";
-            using (SqlCommand verificarCmd = new SqlCommand(verificarParticipantesQuery, connection))
-            {
-                verificarCmd.Parameters.AddWithValue("@carreraId", IDCarrera);
-                verificarCmd.Parameters.AddWithValue("@categoria", categoria);
-                participantes = (int)await verificarCmd.ExecuteScalarAsync();
-            }
-
-            return participantes;
+            
+            return (0, 0);
         }
 
 
@@ -760,7 +738,7 @@ SELECT TOP 3
     apP_corredor, 
     apM_corredor, 
     T1, T2, T3, 
-    TiempoTotal
+    TiempoFinal
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
@@ -808,7 +786,7 @@ SELECT TOP 3
     apP_corredor, 
     apM_corredor, 
     T1, T2, T3, 
-    TiempoTotal
+    TiempoFinal
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
@@ -856,7 +834,7 @@ SELECT TOP 3
     apP_corredor, 
     apM_corredor, 
     T1, T2, T3, 
-    TiempoTotal
+    TiempoFinal
 FROM Posiciones
 ORDER BY Posicion;";
                     break;
@@ -1242,9 +1220,9 @@ FROM TotalTiempos;";
                             return Json(new { success = false, message = "Error al procesar las opciones del reporte." });
                         }
 
-                        // Verificar participantes en la categoría
-                        int participantes = await ReporteCarreras_VerificarParticipantes(carreraId, categoria, connection);
-                        if (participantes == 0)
+                        // Obtener todos los participantes por sexo de en la categoría con una sola consulta
+                        var (totalHombres, totalMujeres) = await ReporteCarreras_ConteoPorSexo(carreraId, categoria, connection);
+                        if (totalHombres + totalMujeres == 0)
                         {
                             numeroCorredores.Enqueue(-1); // Marcar que no hay hombres
                             numeroCorredores.Enqueue(-1); // Marcar que no hay mujeres
@@ -1255,10 +1233,6 @@ FROM TotalTiempos;";
                         {
                             existeAlgunCorredor = true;
                         }
-
-                        // Obtener totales de participantes por género para la categoría actual
-                        int totalHombres = await ReporteCarreras_TodosLosHombres(carreraId, categoria, connection);
-                        int totalMujeres = await ReporteCarreras_TodasLasMujeres(carreraId, categoria, connection);
 
                         // Encolar para la sección de Hombres y Mujeres respectivamente.
                         // Se encola -1 si no hay corredores en la sección.

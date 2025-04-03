@@ -111,7 +111,10 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 await connection.OpenAsync();
-                string sql = "SELECT DISTINCT year_carrera FROM CARRERA";
+                string sql = @"
+                    SELECT DISTINCT c.year_carrera 
+                    FROM CARRERA c
+                    INNER JOIN CARR_Cat cc ON c.ID_carrera = cc.ID_carrera";
                 using (SqlCommand command = new SqlCommand(sql, connection))
                 using (SqlDataReader reader = await command.ExecuteReaderAsync())
                 {
@@ -1016,12 +1019,18 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 string query = @"
             SELECT 
                 ca.ID_carrera,
-                CONCAT(ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')', ' (', STRING_AGG(cat.nombre_categoria, ', '), ')') AS Carrera
+                CONCAT(
+                    ca.nom_carrera, ' - ', ca.year_carrera, ' (Edición: ', ca.edi_carrera, ')',
+                    CASE 
+                        WHEN STRING_AGG(cat.nombre_categoria, ', ') IS NOT NULL 
+                        THEN CONCAT(' (', STRING_AGG(cat.nombre_categoria, ', '), ')') 
+                        ELSE '' 
+                    END
+                ) AS Carrera
             FROM CARRERA ca
-            JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
-            JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+            LEFT JOIN CARR_CAT cc ON ca.ID_carrera = cc.ID_carrera
+            LEFT JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
             GROUP BY ca.ID_carrera, ca.nom_carrera, ca.year_carrera, ca.edi_carrera
-            HAVING COUNT(cc.ID_categoria) = 3
             ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
 
                 using (SqlCommand command = new SqlCommand(query, connection))
@@ -1047,29 +1056,79 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         {
             string connectionString = _configuration.GetConnectionString("DefaultConnection");
 
-            using (SqlConnection connection = new SqlConnection(connectionString))
+            try
             {
-                await connection.OpenAsync();
-
-                // Eliminar los registros relacionados en la tabla CARR_CAT
-                string deleteCarrCatQuery = "DELETE FROM CARR_CAT WHERE ID_carrera = @ID_carrera";
-                using (SqlCommand command = new SqlCommand(deleteCarrCatQuery, connection))
+                using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    command.Parameters.AddWithValue("@ID_carrera", carreraId);
-                    await command.ExecuteNonQueryAsync();
+                    await connection.OpenAsync();
+
+                    // 0. Verificar si la carrera existe
+                    string checkRaceQuery = "SELECT COUNT(*) FROM CARRERA WHERE ID_carrera = @ID_carrera";
+                    using (SqlCommand checkRaceCommand = new SqlCommand(checkRaceQuery, connection))
+                    {
+                        checkRaceCommand.Parameters.AddWithValue("@ID_carrera", carreraId);
+                        int raceExists = (int)await checkRaceCommand.ExecuteScalarAsync();
+                        if (raceExists == 0)
+                        {
+                            _logger.LogWarning("Intentando eliminar una carrera que no existe.");
+                            // Aquí podrías optar por retornar un mensaje o continuar para limpiar datos huérfanos.
+                        }
+                    }
+
+                    // 1. Verificar si existen tiempos registrados para los corredores de la carrera
+                    string checkTiemposQuery = @"
+                SELECT COUNT(*)
+                FROM TIEMPO t
+                INNER JOIN Vincula_participante vp ON t.folio_chip = vp.folio_chip
+                INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
+                WHERE cc.ID_carrera = @ID_carrera";
+                    using (SqlCommand checkTiemposCommand = new SqlCommand(checkTiemposQuery, connection))
+                    {
+                        checkTiemposCommand.Parameters.AddWithValue("@ID_carrera", carreraId);
+                        int countTiempos = (int)await checkTiemposCommand.ExecuteScalarAsync();
+
+                        if (countTiempos > 0)
+                        {
+                            return Json(new { success = false, message = "No se puede eliminar la carrera porque hay tiempos registrados." });
+                        }
+                    }
+
+                    // 2. Iniciar una transacción para agrupar las operaciones de eliminación
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        // Eliminar registros en CARR_Cat
+                        string deleteCarrCatQuery = "DELETE FROM CARR_Cat WHERE ID_carrera = @ID_carrera";
+                        using (SqlCommand deleteCarrCatCommand = new SqlCommand(deleteCarrCatQuery, connection, transaction))
+                        {
+                            deleteCarrCatCommand.Parameters.AddWithValue("@ID_carrera", carreraId);
+                            int affectedRows = await deleteCarrCatCommand.ExecuteNonQueryAsync();
+                            // Si no se eliminó ninguna fila, podría ser una anomalía (carrera sin categorías) o datos huérfanos.
+                            if (affectedRows == 0)
+                            {
+                                _logger.LogWarning("No se encontraron categorías asociadas a la carrera. Verificar integridad de datos.");
+                            }
+                        }
+
+                        // Eliminar la carrera de CARRERA
+                        string deleteCarreraQuery = "DELETE FROM CARRERA WHERE ID_carrera = @ID_carrera";
+                        using (SqlCommand deleteCarreraCommand = new SqlCommand(deleteCarreraQuery, connection, transaction))
+                        {
+                            deleteCarreraCommand.Parameters.AddWithValue("@ID_carrera", carreraId);
+                            await deleteCarreraCommand.ExecuteNonQueryAsync();
+                        }
+
+                        // Confirmar la transacción
+                        transaction.Commit();
+                    }
                 }
 
-                // Ahora eliminar la carrera de la tabla CARRERA
-                string deleteCarreraQuery = "DELETE FROM CARRERA WHERE ID_carrera = @ID_carrera";
-                using (SqlCommand command = new SqlCommand(deleteCarreraQuery, connection))
-                {
-                    command.Parameters.AddWithValue("@ID_carrera", carreraId);
-                    await command.ExecuteNonQueryAsync();
-                }
+                return Json(new { success = true, message = "Carrera eliminada correctamente." });
             }
-
-            // Después de eliminar la carrera y los registros relacionados, redirigir con un mensaje de éxito
-            return Json(new { success = true });
+            catch (Exception ex_sql)
+            {
+                _logger.LogError($"Error al eliminar la carrera: {ex_sql.Message}");
+                return Json(new { success = false, message = "No se pudo completar la eliminación de la carrera." });
+            }
         }
 
         private async Task<List<string>> ObtenerCategoriasPorCarrera(int carreraId)
@@ -1823,7 +1882,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Verificar si el corredor tiene tiempos registrados
+                    // 1. Verificar si el corredor tiene tiempos registrados
                     string verificarTiemposQuery = @"
                 SELECT COUNT(*)
                 FROM TIEMPO t
@@ -1851,33 +1910,95 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         }
                     }
 
-                    // Eliminar el corredor de la tabla `Vincula_participante`
-                    string eliminarCorredorQuery = @"
-                DELETE FROM Vincula_participante
-                WHERE ID_carr_cat IN (
-                    SELECT cc.ID_carr_cat
-                    FROM CARR_Cat cc
+                    // Usamos una transacción para agrupar las operaciones de eliminación
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        // 2. Obtener el ID del corredor (ID_corredor) asociado al vínculo a eliminar
+                        byte[] corredorId;
+                        string obtenerCorredorQuery = @"
+                    SELECT TOP 1 vp.ID_corredor
+                    FROM Vincula_participante vp
+                    JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
                     JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
                     JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
                     WHERE ca.year_carrera = @Year
                       AND ca.edi_carrera = @Edicion
                       AND cat.nombre_categoria = @Categoria
-                  )
-                  AND num_corredor = @Numero";
+                      AND vp.num_corredor = @Numero";
 
-                    using (SqlCommand eliminarCommand = new SqlCommand(eliminarCorredorQuery, connection))
-                    {
-                        eliminarCommand.Parameters.AddWithValue("@Year", year);
-                        eliminarCommand.Parameters.AddWithValue("@Edicion", edicion);
-                        eliminarCommand.Parameters.AddWithValue("@Categoria", categoria);
-                        eliminarCommand.Parameters.AddWithValue("@Numero", numero);
-
-                        int filasAfectadas = await eliminarCommand.ExecuteNonQueryAsync();
-                        if (filasAfectadas == 0)
+                        using (SqlCommand obtenerCommand = new SqlCommand(obtenerCorredorQuery, connection, transaction))
                         {
-                            _logger.LogWarning("No se encontró ningún corredor con los parámetros proporcionados.");
-                            return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                            obtenerCommand.Parameters.AddWithValue("@Year", year);
+                            obtenerCommand.Parameters.AddWithValue("@Edicion", edicion);
+                            obtenerCommand.Parameters.AddWithValue("@Categoria", categoria);
+                            obtenerCommand.Parameters.AddWithValue("@Numero", numero);
+                            object result = await obtenerCommand.ExecuteScalarAsync();
+                            if (result == null)
+                            {
+                                _logger.LogWarning("No se encontró ningún corredor con los parámetros proporcionados.");
+                                transaction.Rollback();
+                                return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                            }
+                            corredorId = (byte[])result;
                         }
+
+                        // 3. Eliminar el vínculo del corredor en la tabla Vincula_participante
+                        string eliminarVinculoQuery = @"
+                    DELETE FROM Vincula_participante
+                    WHERE ID_carr_cat IN (
+                        SELECT cc.ID_carr_cat
+                        FROM CARR_Cat cc
+                        JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                        JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                        WHERE ca.year_carrera = @Year
+                          AND ca.edi_carrera = @Edicion
+                          AND cat.nombre_categoria = @Categoria
+                    )
+                    AND num_corredor = @Numero";
+
+                        using (SqlCommand eliminarCommand = new SqlCommand(eliminarVinculoQuery, connection, transaction))
+                        {
+                            eliminarCommand.Parameters.AddWithValue("@Year", year);
+                            eliminarCommand.Parameters.AddWithValue("@Edicion", edicion);
+                            eliminarCommand.Parameters.AddWithValue("@Categoria", categoria);
+                            eliminarCommand.Parameters.AddWithValue("@Numero", numero);
+
+                            int filasAfectadas = await eliminarCommand.ExecuteNonQueryAsync();
+                            if (filasAfectadas == 0)
+                            {
+                                _logger.LogWarning("No se encontró ningún registro de vínculo para el corredor con los parámetros proporcionados.");
+                                transaction.Rollback();
+                                return Json(new { success = false, message = "No se encontró ningún corredor con los parámetros proporcionados." });
+                            }
+                        }
+
+                        // 4. Verificar si el corredor sigue vinculado a alguna otra carrera
+                        string verificarVinculosQuery = @"
+                    SELECT COUNT(*)
+                    FROM Vincula_participante
+                    WHERE ID_corredor = @IDCorredor";
+
+                        using (SqlCommand verificarVinculosCommand = new SqlCommand(verificarVinculosQuery, connection, transaction))
+                        {
+                            verificarVinculosCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+                            int vinculosRestantes = (int)await verificarVinculosCommand.ExecuteScalarAsync();
+                            if (vinculosRestantes == 0)
+                            {
+                                // 5. Si no tiene más vínculos, eliminar el registro de CORREDOR
+                                string eliminarRegistroCorredorQuery = @"
+                            DELETE FROM CORREDOR
+                            WHERE ID_corredor = @IDCorredor";
+
+                                using (SqlCommand eliminarRegistroCommand = new SqlCommand(eliminarRegistroCorredorQuery, connection, transaction))
+                                {
+                                    eliminarRegistroCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
+                                    await eliminarRegistroCommand.ExecuteNonQueryAsync();
+                                }
+                            }
+                        }
+
+                        // Confirmar la transacción
+                        transaction.Commit();
                     }
                 }
 
