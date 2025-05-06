@@ -564,197 +564,118 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         {
             try
             {
+                // 1) Inserto o recupero el corredor
+                byte[] corredorId;
                 string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                using (var connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // Preparar el valor del correo: si es nulo, vacío o no contiene '@', se usa DBNull.
-                    object correoParametro = string.IsNullOrWhiteSpace(Correo) || !Correo.Contains("@")
-                        ? (object)DBNull.Value
-                        : Correo;
+                    // — Inserción en CORREDOR con OUTPUT para devolver el newID
+                    var insertCorredorSql = @"
+                INSERT INTO CORREDOR
+                  (nom_corredor, apP_corredor, apM_corredor,
+                   f_corredor, sex_corredor, c_corredor, pais)
+                OUTPUT INSERTED.ID_corredor
+                VALUES
+                  (@Nombre, @Apaterno, @Amaterno,
+                   @Fnacimiento, @Sexo, @Correo, @Pais);
+            ";
+                    using var cmdInsert = new SqlCommand(insertCorredorSql, connection);
+                    cmdInsert.Parameters.AddWithValue("@Nombre", Nombre);
+                    cmdInsert.Parameters.AddWithValue("@Apaterno", Apaterno);
+                    cmdInsert.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
+                    cmdInsert.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
+                    cmdInsert.Parameters.AddWithValue("@Sexo", Sexo);
+                    cmdInsert.Parameters.AddWithValue("@Correo",
+                        string.IsNullOrWhiteSpace(Correo) || !Correo.Contains("@")
+                          ? (object)DBNull.Value
+                          : Correo);
+                    cmdInsert.Parameters.AddWithValue("@Pais", (object?)Pais ?? DBNull.Value);
 
-                    byte[]? corredorId = null;
-                    try
+                    corredorId = (byte[])await cmdInsert.ExecuteScalarAsync();
+
+                    // 2) Obtengo el ID de la combinación Carrera–Categoría
+                    var getCarrCatSql = @"
+                SELECT cc.ID_carr_cat
+                  FROM CARR_Cat cc
+                  JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                 WHERE cc.ID_carrera = @CarreraId
+                   AND cat.nombre_categoria = @CategoriaNombre;
+            ";
+                    using var cmdGetCarrCat = new SqlCommand(getCarrCatSql, connection);
+                    cmdGetCarrCat.Parameters.AddWithValue("@CarreraId", CarreraId);
+                    cmdGetCarrCat.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
+                    var idCarrCatObj = await cmdGetCarrCat.ExecuteScalarAsync();
+                    if (idCarrCatObj == null)
+                        return Json(new { success = false, message = "Categoría inválida para esa carrera." });
+
+                    var idCarrCat = (int)idCarrCatObj;
+
+                    // 3) Inserto en Vincula_participante SÓLO con los campos mínimos.
+                    //    El trg_VP_InsteadOfInsert se encargará de num_corredor y folio_chip.
+                    var insertVinculoSql = @"
+                INSERT INTO Vincula_participante
+                  (ID_vinculo, ID_corredor, ID_carr_cat)
+                VALUES
+                  (NEWID(), @IDCorredor, @IDCarrCat);
+            ";
+                    using var cmdVinculo = new SqlCommand(insertVinculoSql, connection);
+                    cmdVinculo.Parameters.AddWithValue("@IDCorredor", corredorId);
+                    cmdVinculo.Parameters.AddWithValue("@IDCarrCat", idCarrCat);
+                    await cmdVinculo.ExecuteNonQueryAsync();
+
+                    // 4) Recupero el chip y num_corredor que el trigger acaba de generar
+                    var getChipSql = @"
+                SELECT TOP 1
+                       folio_chip,
+                       num_corredor
+                  FROM Vincula_participante
+                 WHERE ID_corredor = @IDCorredor
+                   AND ID_carr_cat = @IDCarrCat
+                 ORDER BY num_corredor DESC;
+            ";
+                    using var cmdGetChip = new SqlCommand(getChipSql, connection);
+                    cmdGetChip.Parameters.AddWithValue("@IDCorredor", corredorId);
+                    cmdGetChip.Parameters.AddWithValue("@IDCarrCat", idCarrCat);
+
+                    using var reader = await cmdGetChip.ExecuteReaderAsync();
+                    if (!await reader.ReadAsync())
                     {
-                        string insertCorredorSql = @"
-                    INSERT INTO CORREDOR (nom_corredor, apP_corredor, apM_corredor, 
-                                          f_corredor, sex_corredor, c_corredor, pais) 
-                    OUTPUT INSERTED.ID_corredor
-                    VALUES (@Nombre, @Apaterno, @Amaterno, @Fnacimiento, @Sexo, @Correo, @Pais)";
-
-                        using (SqlCommand insertCommand = new SqlCommand(insertCorredorSql, connection))
-                        {
-                            insertCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                            insertCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                            insertCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                            insertCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                            insertCommand.Parameters.AddWithValue("@Sexo", Sexo);
-                            insertCommand.Parameters.AddWithValue("@Correo", correoParametro);
-                            insertCommand.Parameters.AddWithValue("@Pais", Pais ?? (object)DBNull.Value);
-
-                            corredorId = (byte[])await insertCommand.ExecuteScalarAsync();
-                        }
-                    }
-                    catch (SqlException ex) when (ex.Number == 2627) // Error de clave duplicada
-                    {
-                        // Si ocurre un duplicado, obtener el ID del corredor existente
-                        string getCorredorSql = @"
-                    SELECT ID_corredor 
-                    FROM CORREDOR 
-                    WHERE nom_corredor = @Nombre AND apP_corredor = @Apaterno 
-                      AND (apM_corredor = @Amaterno OR @Amaterno IS NULL)
-                      AND f_corredor = @Fnacimiento";
-
-                        using (SqlCommand getCorredorCommand = new SqlCommand(getCorredorSql, connection))
-                        {
-                            getCorredorCommand.Parameters.AddWithValue("@Nombre", Nombre);
-                            getCorredorCommand.Parameters.AddWithValue("@Apaterno", Apaterno);
-                            getCorredorCommand.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                            getCorredorCommand.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-
-                            corredorId = (byte[]?)await getCorredorCommand.ExecuteScalarAsync();
-                        }
-                    }
-
-                    if (corredorId == null)
-                        return Json(new { success = false, message = "No se pudo obtener o crear el corredor." });
-
-                    // Verificar existencia de la categoría
-                    string getCategoriaSql = @"
-                SELECT ID_categoria 
-                FROM CATEGORIA 
-                WHERE nombre_categoria = @CategoriaNombre";
-
-                    int? idCategoria;
-                    using (SqlCommand getCategoriaCommand = new SqlCommand(getCategoriaSql, connection))
-                    {
-                        getCategoriaCommand.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
-                        idCategoria = (int?)await getCategoriaCommand.ExecuteScalarAsync();
-                    }
-
-                    if (!idCategoria.HasValue)
-                        return Json(new { success = false, message = "Categoría seleccionada no válida." });
-
-                    // Verificar existencia de la combinación Carrera-Categoría
-                    string getCarrCatSql = @"
-                SELECT ID_carr_cat 
-                FROM CARR_Cat 
-                WHERE ID_carrera = @CarreraId AND ID_categoria = @IDCategoria";
-
-                    int? idCarrCat;
-                    using (SqlCommand getCarrCatCommand = new SqlCommand(getCarrCatSql, connection))
-                    {
-                        getCarrCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
-                        getCarrCatCommand.Parameters.AddWithValue("@IDCategoria", idCategoria.Value);
-                        idCarrCat = (int?)await getCarrCatCommand.ExecuteScalarAsync();
+                        // Esto no debería ocurrir: el trigger debió insertar
+                        throw new InvalidOperationException("No se pudo recuperar el folio_chip generado.");
                     }
 
-                    if (!idCarrCat.HasValue)
-                        return Json(new { success = false, message = "La combinación de Carrera y Categoría no es válida." });
+                    string folioChip = reader.GetString(0);
+                    int numCorredor = reader.GetInt32(1);
 
-                    // VALIDACIÓN: Evitar que el corredor se inscriba en más de una categoría en la misma carrera.
-                    string checkMultiCatSql = @"
-                SELECT COUNT(*) 
-                FROM Vincula_participante vp
-                INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
-                WHERE vp.ID_corredor = @IDCorredor AND cc.ID_carrera = @CarreraId";
-
-                    using (SqlCommand checkMultiCatCommand = new SqlCommand(checkMultiCatSql, connection))
+                    // 5) Retorno JSON con el chip y número asignado
+                    return Json(new
                     {
-                        checkMultiCatCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
-                        checkMultiCatCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
-                        int countInscripciones = (int)await checkMultiCatCommand.ExecuteScalarAsync();
-                        if (countInscripciones > 0)
-                        {
-                            // Obtener los detalles de la carrera para el mensaje
-                            string getCarreraInfoSql = @"
-            SELECT nom_carrera, year_carrera, edi_carrera 
-            FROM CARRERA 
-            WHERE ID_carrera = @CarreraId";
-
-                            using (SqlCommand getCarreraInfoCommand = new SqlCommand(getCarreraInfoSql, connection))
-                            {
-                                getCarreraInfoCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
-                                using (var reader = await getCarreraInfoCommand.ExecuteReaderAsync())
-                                {
-                                    if (await reader.ReadAsync())
-                                    {
-                                        string nomCarrera = reader["nom_carrera"].ToString();
-                                        string yearCarrera = reader["year_carrera"].ToString();
-                                        string ediCarrera = reader["edi_carrera"].ToString();
-
-                                        _logger.LogWarning($"El corredor {Nombre} {Apaterno} ya está inscrito en la carrera {nomCarrera} ({yearCarrera}, edición {ediCarrera}) en otra categoría.");
-                                        return Json(new { success = false, message = $"El corredor ya está asociado a la carrera {nomCarrera} ({yearCarrera}, edición {ediCarrera})." });
-                                    }
-                                    else
-                                    {
-                                        // Si no se encuentra la información de la carrera, usar un mensaje genérico
-                                        _logger.LogWarning($"El corredor {Nombre} {Apaterno} ya está inscrito en la carrera {CarreraId} en otra categoría.");
-                                        return Json(new { success = false, message = "El corredor ya está asociado a una categoría de esta carrera." });
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Verificar duplicidad exacta en la misma Carrera-Categoría.
-                    string checkVinculoSql = @"
-                SELECT COUNT(*) 
-                FROM Vincula_participante 
-                WHERE ID_corredor = @IDCorredor AND ID_carr_cat = @IDCarrCat";
-
-                    using (SqlCommand checkVinculoCommand = new SqlCommand(checkVinculoSql, connection))
-                    {
-                        checkVinculoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
-                        checkVinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
-
-                        if ((int)await checkVinculoCommand.ExecuteScalarAsync() > 0)
-                        {
-                            _logger.LogWarning($"El corredor {Nombre} {Apaterno} ya está vinculado a la categoría de la carrera especificada.");
-                            return Json(new { success = false, message = "El corredor ya está asociado a esta categoría de la carrera." });
-                        }
-                    }
-
-                    // INSERTAR EL VÍNCULO: calcular num_corredor y generar chip único por carrera.
-                    string insertVinculoSql = @"
-                INSERT INTO Vincula_participante (ID_corredor, ID_carr_cat, num_corredor, folio_chip) 
-                VALUES (
-                    @IDCorredor, 
-                    @IDCarrCat,
-                    (
-                        SELECT ISNULL(MAX(vp.num_corredor), 0) + 1 
-                        FROM Vincula_participante vp
-                        INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
-                        WHERE cc.ID_carrera = @CarreraId
-                    ),
-                    'RFID' + CAST(
-                        1000000000 + (
-                            SELECT ISNULL(MAX(vp.num_corredor), 0) + 1 
-                            FROM Vincula_participante vp
-                            INNER JOIN CARR_Cat cc ON vp.ID_carr_cat = cc.ID_carr_cat
-                            WHERE cc.ID_carrera = @CarreraId
-                        ) AS VARCHAR
-                    )
-                )";
-
-                    using (SqlCommand vinculoCommand = new SqlCommand(insertVinculoSql, connection))
-                    {
-                        vinculoCommand.Parameters.AddWithValue("@IDCorredor", corredorId);
-                        vinculoCommand.Parameters.AddWithValue("@IDCarrCat", idCarrCat.Value);
-                        vinculoCommand.Parameters.AddWithValue("@CarreraId", CarreraId);
-
-                        await vinculoCommand.ExecuteNonQueryAsync();
-                    }
+                        success = true,
+                        message = "Corredor creado y vinculado correctamente.",
+                        numCorredor,
+                        folioChip
+                    });
                 }
-
-                return Json(new { success = true, message = "Corredor vinculado exitosamente a la nueva carrera." });
+            }
+            catch (SqlException ex) when (ex.Number == 50000)
+            {
+                // Errores lanzados por RAISERROR en tus triggers (p.ej. duplicados, restricciones)
+                _logger.LogWarning($"Error de negocio al crear corredor: {ex.Message}");
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch (SqlException ex)
+            {
+                // Cualquier otro error de SQL Server
+                _logger.LogError($"Error SQL al crear corredor: {ex.Message}", ex);
+                return Json(new { success = false, message = "Error de base de datos al crear corredor." });
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al vincular el corredor: {ex.Message}");
-                return Json(new { success = false, message = "Ocurrió un error al vincular el corredor." });
+                // Errores inesperados
+                _logger.LogError($"Error inesperado al crear corredor: {ex.Message}", ex);
+                return Json(new { success = false, message = "Ocurrió un error inesperado. Intente de nuevo más tarde." });
             }
         }
 
@@ -787,6 +708,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
 
 
 
+        [HttpPost]
         public async Task<IActionResult> Baja_Corredor(int corredorId)
         {
             try
@@ -796,40 +718,56 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Verificar si el corredor existe
-                    string checkSql = "SELECT COUNT(*) FROM Corredor WHERE CorredorId = @CorredorId";
-                    using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
+                    // Verificar que exista el corredor
+                    string checkSql = "SELECT COUNT(*) FROM CORREDOR WHERE ID_corredor = @CorredorId";
+                    using (var checkCmd = new SqlCommand(checkSql, connection))
                     {
-                        checkCommand.Parameters.AddWithValue("@CorredorId", corredorId);
-                        int count = (int)await checkCommand.ExecuteScalarAsync();
-
+                        checkCmd.Parameters.AddWithValue("@CorredorId", corredorId);
+                        int count = (int)await checkCmd.ExecuteScalarAsync();
                         if (count == 0)
                         {
-                            // Corredor no encontrado
                             _logger.LogWarning($"Corredor con ID {corredorId} no encontrado.");
                             ModelState.AddModelError(string.Empty, "Corredor no encontrado.");
                             return View();
                         }
                     }
 
-                    // Eliminar el corredor
-                    string deleteSql = "DELETE FROM Corredor WHERE CorredorId = @CorredorId";
-                    using (SqlCommand deleteCommand = new SqlCommand(deleteSql, connection))
+                    // Intento de eliminar el corredor
+                    string deleteSql = "DELETE FROM CORREDOR WHERE ID_corredor = @CorredorId";
+                    using (var deleteCmd = new SqlCommand(deleteSql, connection))
                     {
-                        deleteCommand.Parameters.AddWithValue("@CorredorId", corredorId);
-                        await deleteCommand.ExecuteNonQueryAsync();
+                        deleteCmd.Parameters.AddWithValue("@CorredorId", corredorId);
+                        await deleteCmd.ExecuteNonQueryAsync();
                     }
                 }
 
-                // Baja exitosa
+                // Si llegamos aquí, fue exitoso
                 _logger.LogInformation($"Corredor con ID {corredorId} dado de baja exitosamente.");
                 TempData["SuccessMessage"] = "Corredor dado de baja exitosamente.";
                 return RedirectToAction("Index");
             }
+            catch (SqlException ex) when (ex.Number == 547)
+            {
+                // Violación de FK / trigger de tiempos o vínculos existentes
+                _logger.LogError($"No se puede eliminar corredor {corredorId}: {ex.Message}");
+                ModelState.AddModelError(string.Empty,
+                    "No se puede eliminar el corredor porque tiene registros o vínculos en alguna carrera.");
+                return View();
+            }
+            catch (SqlException ex)
+            {
+                // Otros errores SQL
+                _logger.LogError($"Error SQL al dar de baja al corredor {corredorId}: {ex.Message}");
+                ModelState.AddModelError(string.Empty,
+                    $"Error al dar de baja al corredor: {ex.Message}");
+                return View();
+            }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al dar de baja al corredor: {ex.Message}");
-                ModelState.AddModelError(string.Empty, "Error al dar de baja al corredor. Por favor, int�ntelo de nuevo m�s tarde.");
+                // Cualquier otro tipo de excepción
+                _logger.LogError($"Error inesperado al dar de baja al corredor {corredorId}: {ex.Message}");
+                ModelState.AddModelError(string.Empty,
+                    "Error inesperado al dar de baja al corredor. Por favor, inténtelo de nuevo más tarde.");
                 return View();
             }
         }
@@ -2675,81 +2613,60 @@ ORDER BY ca.year_carrera DESC, ca.edi_carrera DESC";
         [HttpPost]
         public async Task<IActionResult> ConfirmarEliminarCorredor([FromBody] BajaCorredorRequest request)
         {
-            if (request.YearCarrera <= 0 || request.EdiCarrera <= 0 || string.IsNullOrEmpty(request.Categoria) || request.NumCorredor <= 0)
+            if (request.YearCarrera <= 0
+                || request.EdiCarrera <= 0
+                || string.IsNullOrEmpty(request.Categoria)
+                || request.NumCorredor <= 0)
             {
                 return Json(new { success = false, message = "Parámetros inválidos." });
             }
 
-            string connectionString = _configuration.GetConnectionString("DefaultConnection");
-
             try
             {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
 
-                    // **Verificar si el corredor tiene tiempos registrados**
-                    string verificarTiemposQuery = @"
-                SELECT COUNT(*) 
-                FROM TIEMPO t
-                JOIN Vincula_participante vp ON t.folio_chip = vp.folio_chip
-                JOIN CARR_Cat cc ON vp.ID_Carr_cat = cc.ID_carr_cat
-                JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
-                JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                WHERE ca.year_carrera = @YearCarrera
-                  AND ca.edi_carrera = @EdiCarrera
-                  AND cat.nombre_categoria = @Categoria
-                  AND vp.num_corredor = @NumCorredor";
-
-                    using (SqlCommand verificarCommand = new SqlCommand(verificarTiemposQuery, connection))
-                    {
-                        verificarCommand.Parameters.AddWithValue("@YearCarrera", request.YearCarrera);
-                        verificarCommand.Parameters.AddWithValue("@EdiCarrera", request.EdiCarrera);
-                        verificarCommand.Parameters.AddWithValue("@Categoria", request.Categoria);
-                        verificarCommand.Parameters.AddWithValue("@NumCorredor", request.NumCorredor);
-
-                        int tiemposRegistrados = (int)await verificarCommand.ExecuteScalarAsync();
-                        if (tiemposRegistrados > 0)
-                        {
-                            return Json(new { success = false, message = "No se puede eliminar el corredor porque tiene tiempos registrados." });
-                        }
-                    }
-
-                    // **Eliminar el corredor**
                     string eliminarQuery = @"
                 DELETE FROM Vincula_participante
-                WHERE ID_carr_cat IN (
-                    SELECT cc.ID_carr_cat
-                    FROM CARR_Cat cc
-                    JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
-                    JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                    WHERE ca.year_carrera = @YearCarrera
-                      AND ca.edi_carrera = @EdiCarrera
-                      AND cat.nombre_categoria = @Categoria
-                )
-                AND num_corredor = @NumCorredor";
+                 WHERE ID_carr_cat = (
+                     SELECT cc.ID_carr_cat
+                       FROM CARR_Cat cc
+                       JOIN CARRERA ca ON cc.ID_carrera = ca.ID_carrera
+                       JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+                      WHERE ca.year_carrera = @YearCarrera
+                        AND ca.edi_carrera = @EdiCarrera
+                        AND cat.nombre_categoria = @Categoria
+                 )
+                   AND num_corredor = @NumCorredor;
+            ";
 
-                    using (SqlCommand eliminarCommand = new SqlCommand(eliminarQuery, connection))
+                    using (var eliminarCmd = new SqlCommand(eliminarQuery, connection))
                     {
-                        eliminarCommand.Parameters.AddWithValue("@YearCarrera", request.YearCarrera);
-                        eliminarCommand.Parameters.AddWithValue("@EdiCarrera", request.EdiCarrera);
-                        eliminarCommand.Parameters.AddWithValue("@Categoria", request.Categoria);
-                        eliminarCommand.Parameters.AddWithValue("@NumCorredor", request.NumCorredor);
+                        eliminarCmd.Parameters.AddWithValue("@YearCarrera", request.YearCarrera);
+                        eliminarCmd.Parameters.AddWithValue("@EdiCarrera", request.EdiCarrera);
+                        eliminarCmd.Parameters.AddWithValue("@Categoria", request.Categoria);
+                        eliminarCmd.Parameters.AddWithValue("@NumCorredor", request.NumCorredor);
 
-                        int filasAfectadas = await eliminarCommand.ExecuteNonQueryAsync();
+                        int filasAfectadas = await eliminarCmd.ExecuteNonQueryAsync();
                         if (filasAfectadas == 0)
-                        {
-                            return Json(new { success = false, message = "No se encontró al corredor." });
-                        }
+                            return Json(new { success = false, message = "No se encontró al corredor o ya fue eliminado." });
                     }
                 }
 
                 return Json(new { success = true, message = "Corredor eliminado correctamente." });
             }
+            catch (SqlException ex)
+            {
+                // Podría venir de tu trigger trg_VP_InsteadOfDelete con RAISERROR(...)
+                _logger.LogError($"Error SQL al eliminar corredor: {ex.Message}");
+                return Json(new { success = false, message = ex.Message });
+            }
             catch (Exception ex)
             {
-                _logger.LogError($"Error al eliminar el corredor: {ex.Message}");
-                return Json(new { success = false, message = "Error al eliminar el corredor." });
+                _logger.LogError($"Error inesperado al eliminar corredor: {ex.Message}");
+                return Json(new { success = false, message = "Error inesperado al eliminar el corredor." });
             }
         }
 
