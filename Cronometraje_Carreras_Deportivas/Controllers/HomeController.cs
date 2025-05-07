@@ -564,118 +564,102 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         {
             try
             {
-                // 1) Inserto o recupero el corredor
-                byte[] corredorId;
-                string connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using (var connection = new SqlConnection(connectionString))
+                var connStr = _configuration.GetConnectionString("DefaultConnection");
+                await using var connection = new SqlConnection(connStr);
+                await connection.OpenAsync();
+
+                // Iniciar la transacción (síncrona, pero no bloquea E/S)
+                using var transaction = connection.BeginTransaction();
+
+                // 1) Insertar o recuperar el corredor
+                Guid corredorId;
+                try
                 {
-                    await connection.OpenAsync();
+                    const string sqlInsert = @"
+INSERT INTO dbo.CORREDOR
+  (nom_corredor, apP_corredor, apM_corredor, f_corredor, sex_corredor, c_corredor, pais)
+OUTPUT inserted.ID_corredor
+VALUES (@Nombre,@Apaterno,@Amaterno,@Fnacimiento,@Sexo,@Correo,@Pais);
+";
+                    await using var cmdIns = new SqlCommand(sqlInsert, connection, transaction);
+                    cmdIns.Parameters.Add("@Nombre", SqlDbType.NVarChar, 100).Value = Nombre;
+                    cmdIns.Parameters.Add("@Apaterno", SqlDbType.NVarChar, 100).Value = Apaterno;
+                    cmdIns.Parameters.Add("@Amaterno", SqlDbType.NVarChar, 100).Value = (object?)Amaterno ?? DBNull.Value;
+                    cmdIns.Parameters.Add("@Fnacimiento", SqlDbType.Date).Value = Fnacimiento;
+                    cmdIns.Parameters.Add("@Sexo", SqlDbType.NVarChar, 1).Value = Sexo;
+                    cmdIns.Parameters.Add("@Correo", SqlDbType.NVarChar, 200)
+                          .Value = string.IsNullOrWhiteSpace(Correo) || !Correo.Contains("@")
+                                      ? DBNull.Value
+                                      : (object)Correo;
+                    cmdIns.Parameters.Add("@Pais", SqlDbType.NVarChar, 100).Value = Pais;
 
-                    // — Inserción en CORREDOR con OUTPUT para devolver el newID
-                    var insertCorredorSql = @"
-                INSERT INTO CORREDOR
-                  (nom_corredor, apP_corredor, apM_corredor,
-                   f_corredor, sex_corredor, c_corredor, pais)
-                OUTPUT INSERTED.ID_corredor
-                VALUES
-                  (@Nombre, @Apaterno, @Amaterno,
-                   @Fnacimiento, @Sexo, @Correo, @Pais);
-            ";
-                    using var cmdInsert = new SqlCommand(insertCorredorSql, connection);
-                    cmdInsert.Parameters.AddWithValue("@Nombre", Nombre);
-                    cmdInsert.Parameters.AddWithValue("@Apaterno", Apaterno);
-                    cmdInsert.Parameters.AddWithValue("@Amaterno", (object?)Amaterno ?? DBNull.Value);
-                    cmdInsert.Parameters.AddWithValue("@Fnacimiento", Fnacimiento);
-                    cmdInsert.Parameters.AddWithValue("@Sexo", Sexo);
-                    cmdInsert.Parameters.AddWithValue("@Correo",
-                        string.IsNullOrWhiteSpace(Correo) || !Correo.Contains("@")
-                          ? (object)DBNull.Value
-                          : Correo);
-                    cmdInsert.Parameters.AddWithValue("@Pais", (object?)Pais ?? DBNull.Value);
-
-                    corredorId = (byte[])await cmdInsert.ExecuteScalarAsync();
-
-                    // 2) Obtengo el ID de la combinación Carrera–Categoría
-                    var getCarrCatSql = @"
-                SELECT cc.ID_carr_cat
-                  FROM CARR_Cat cc
-                  JOIN CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
-                 WHERE cc.ID_carrera = @CarreraId
-                   AND cat.nombre_categoria = @CategoriaNombre;
-            ";
-                    using var cmdGetCarrCat = new SqlCommand(getCarrCatSql, connection);
-                    cmdGetCarrCat.Parameters.AddWithValue("@CarreraId", CarreraId);
-                    cmdGetCarrCat.Parameters.AddWithValue("@CategoriaNombre", CategoriaNombre);
-                    var idCarrCatObj = await cmdGetCarrCat.ExecuteScalarAsync();
-                    if (idCarrCatObj == null)
-                        return Json(new { success = false, message = "Categoría inválida para esa carrera." });
-
-                    var idCarrCat = (int)idCarrCatObj;
-
-                    // 3) Inserto en Vincula_participante SÓLO con los campos mínimos.
-                    //    El trg_VP_InsteadOfInsert se encargará de num_corredor y folio_chip.
-                    var insertVinculoSql = @"
-                INSERT INTO Vincula_participante
-                  (ID_vinculo, ID_corredor, ID_carr_cat)
-                VALUES
-                  (NEWID(), @IDCorredor, @IDCarrCat);
-            ";
-                    using var cmdVinculo = new SqlCommand(insertVinculoSql, connection);
-                    cmdVinculo.Parameters.AddWithValue("@IDCorredor", corredorId);
-                    cmdVinculo.Parameters.AddWithValue("@IDCarrCat", idCarrCat);
-                    await cmdVinculo.ExecuteNonQueryAsync();
-
-                    // 4) Recupero el chip y num_corredor que el trigger acaba de generar
-                    var getChipSql = @"
-                SELECT TOP 1
-                       folio_chip,
-                       num_corredor
-                  FROM Vincula_participante
-                 WHERE ID_corredor = @IDCorredor
-                   AND ID_carr_cat = @IDCarrCat
-                 ORDER BY num_corredor DESC;
-            ";
-                    using var cmdGetChip = new SqlCommand(getChipSql, connection);
-                    cmdGetChip.Parameters.AddWithValue("@IDCorredor", corredorId);
-                    cmdGetChip.Parameters.AddWithValue("@IDCarrCat", idCarrCat);
-
-                    using var reader = await cmdGetChip.ExecuteReaderAsync();
-                    if (!await reader.ReadAsync())
-                    {
-                        // Esto no debería ocurrir: el trigger debió insertar
-                        throw new InvalidOperationException("No se pudo recuperar el folio_chip generado.");
-                    }
-
-                    string folioChip = reader.GetString(0);
-                    int numCorredor = reader.GetInt32(1);
-
-                    // 5) Retorno JSON con el chip y número asignado
-                    return Json(new
-                    {
-                        success = true,
-                        message = "Corredor creado y vinculado correctamente.",
-                        numCorredor,
-                        folioChip
-                    });
+                    corredorId = (Guid)await cmdIns.ExecuteScalarAsync();
                 }
+                catch (SqlException ex) when (ex.Number == 2627) // duplicado
+                {
+                    const string sqlGet = @"
+SELECT ID_corredor
+  FROM dbo.CORREDOR
+ WHERE nom_corredor = @Nombre
+   AND apP_corredor = @Apaterno
+   AND ((apM_corredor = @Amaterno) OR (apM_corredor IS NULL AND @Amaterno IS NULL))
+   AND f_corredor = @Fnacimiento;
+";
+                    await using var cmdGet = new SqlCommand(sqlGet, connection, transaction);
+                    cmdGet.Parameters.Add("@Nombre", SqlDbType.NVarChar, 100).Value = Nombre;
+                    cmdGet.Parameters.Add("@Apaterno", SqlDbType.NVarChar, 100).Value = Apaterno;
+                    cmdGet.Parameters.Add("@Amaterno", SqlDbType.NVarChar, 100).Value = (object?)Amaterno ?? DBNull.Value;
+                    cmdGet.Parameters.Add("@Fnacimiento", SqlDbType.Date).Value = Fnacimiento;
+
+                    corredorId = (Guid)await cmdGet.ExecuteScalarAsync();
+                }
+
+                // 2) Obtener el ID de la combinación Carrera–Categoría
+                const string sqlGetCarrCat = @"
+SELECT cc.ID_carr_cat
+  FROM dbo.CARR_Cat cc
+  JOIN dbo.CATEGORIA cat ON cc.ID_categoria = cat.ID_categoria
+ WHERE cc.ID_carrera = @CarreraId
+   AND cat.nombre_categoria = @CategoriaNombre;
+";
+                await using var cmdCarrCat = new SqlCommand(sqlGetCarrCat, connection, transaction);
+                cmdCarrCat.Parameters.Add("@CarreraId", SqlDbType.Int).Value = CarreraId;
+                cmdCarrCat.Parameters.Add("@CategoriaNombre", SqlDbType.NVarChar, 100).Value = CategoriaNombre;
+
+                var carrCatObj = await cmdCarrCat.ExecuteScalarAsync();
+                if (carrCatObj == null)
+                {
+                    transaction.Rollback();
+                    return Json(new { success = false, message = "Categoría inválida para la carrera." });
+                }
+
+                int idCarrCat = (int)carrCatObj;
+
+                // 3) Insertar vínculo mínimo (el trigger hará num_corredor y folio_chip)
+                const string sqlInsertVinculo = @"
+INSERT INTO dbo.Vincula_participante
+  (ID_vinculo, ID_corredor, ID_carr_cat)
+VALUES
+  (NEWID(), @IDCorredor, @IDCarrCat);
+";
+                await using var cmdVinc = new SqlCommand(sqlInsertVinculo, connection, transaction);
+                cmdVinc.Parameters.Add("@IDCorredor", SqlDbType.UniqueIdentifier).Value = corredorId;
+                cmdVinc.Parameters.Add("@IDCarrCat", SqlDbType.Int).Value = idCarrCat;
+                await cmdVinc.ExecuteNonQueryAsync();
+
+                // 4) Confirmar transacción y devolver sólo éxito
+                transaction.Commit();
+                return Json(new { success = true, message = "Corredor vinculado exitosamente a la carrera." });
             }
             catch (SqlException ex) when (ex.Number == 50000)
             {
-                // Errores lanzados por RAISERROR en tus triggers (p.ej. duplicados, restricciones)
-                _logger.LogWarning($"Error de negocio al crear corredor: {ex.Message}");
+                _logger.LogWarning(ex, "Error de negocio al vincular corredor");
                 return Json(new { success = false, message = ex.Message });
-            }
-            catch (SqlException ex)
-            {
-                // Cualquier otro error de SQL Server
-                _logger.LogError($"Error SQL al crear corredor: {ex.Message}", ex);
-                return Json(new { success = false, message = "Error de base de datos al crear corredor." });
             }
             catch (Exception ex)
             {
-                // Errores inesperados
-                _logger.LogError($"Error inesperado al crear corredor: {ex.Message}", ex);
-                return Json(new { success = false, message = "Ocurrió un error inesperado. Intente de nuevo más tarde." });
+                _logger.LogError(ex, "Error inesperado al vincular corredor");
+                return Json(new { success = false, message = "Ocurrió un error al vincular el corredor." });
             }
         }
 

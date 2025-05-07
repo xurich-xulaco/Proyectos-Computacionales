@@ -1,3 +1,6 @@
+USE [Cronometraje_Carreras_Deportivas];
+GO
+
 -------------------------------------------------------------
 -- ROLLBACK DE PATCHES: deja el esquema tal como al inicio
 -------------------------------------------------------------
@@ -17,61 +20,63 @@ BEGIN TRY
         DROP TRIGGER dbo.trg_CarrCat_AfterDelete;
     
     -----------------------------------------------------------------
-    -- 2) Drops de CONSTRAINTS añadidas
+    -- 2) DROP CONSTRAINTS añadidas en Vincula_participante y CARR_Cat
     -----------------------------------------------------------------
-    -- 2.1 CARR_Cat: clave única
-    IF EXISTS (SELECT 1 
-               FROM sys.objects o 
-               JOIN sys.schemas s ON o.schema_id = s.schema_id 
-               WHERE o.name = 'UQ_CARR_Cat_CarreraCategoria'
-                 AND o.type = 'UQ')
-    BEGIN
+    IF EXISTS (
+        SELECT 1
+          FROM sys.key_constraints kc
+         WHERE kc.name = 'UQ_CARR_Cat_CarreraCategoria'
+           AND kc.parent_object_id = OBJECT_ID('dbo.CARR_Cat')
+    )
         ALTER TABLE dbo.CARR_Cat
         DROP CONSTRAINT UQ_CARR_Cat_CarreraCategoria;
-    END
 
-    -- 2.2 Vincula_participante: unicidad de folio_chip y de corredor–carrera
-    IF EXISTS (SELECT 1 
-               FROM sys.objects o 
-               WHERE o.name = 'UQ_VP_FolioChip' AND o.type = 'UQ')
-    BEGIN
-        ALTER TABLE dbo.Vincula_participante
-        DROP CONSTRAINT UQ_VP_FolioChip;
-    END
-    IF EXISTS (SELECT 1 
-               FROM sys.objects o 
-               WHERE o.name = 'UQ_VP_CorredorCarrera' AND o.type = 'UQ')
-    BEGIN
-        ALTER TABLE dbo.Vincula_participante
-        DROP CONSTRAINT UQ_VP_CorredorCarrera;
-    END
-
-    -- 2.3 Vincula_participante: FK al corredor
-    IF EXISTS (SELECT 1 
-               FROM sys.foreign_keys fk 
-               WHERE fk.name = 'FK_VP_Corredor')
-    BEGIN
+    IF EXISTS (
+        SELECT 1
+          FROM sys.foreign_keys fk
+         WHERE fk.name = 'FK_VP_Corredor'
+           AND fk.parent_object_id = OBJECT_ID('dbo.Vincula_participante')
+    )
         ALTER TABLE dbo.Vincula_participante
         DROP CONSTRAINT FK_VP_Corredor;
-    END
 
-    -- 2.4 TIEMPO: check para evitar '00:00:00'
-    IF EXISTS (SELECT 1 
-               FROM sys.check_constraints cc 
-               WHERE cc.name = 'CHK_TIEMPO_NO_ZERO')
-    BEGIN
+    IF EXISTS (
+        SELECT 1
+          FROM sys.key_constraints kc
+         WHERE kc.name = 'UQ_VP_FolioChip'
+           AND kc.parent_object_id = OBJECT_ID('dbo.Vincula_participante')
+    )
+        ALTER TABLE dbo.Vincula_participante
+        DROP CONSTRAINT UQ_VP_FolioChip;
+
+    IF EXISTS (
+        SELECT 1
+          FROM sys.key_constraints kc
+         WHERE kc.name = 'UQ_VP_CorredorCarrera'
+           AND kc.parent_object_id = OBJECT_ID('dbo.Vincula_participante')
+    )
+        ALTER TABLE dbo.Vincula_participante
+        DROP CONSTRAINT UQ_VP_CorredorCarrera;
+
+    IF EXISTS (
+        SELECT 1
+          FROM sys.check_constraints cc
+         WHERE cc.name = 'CHK_TIEMPO_NO_ZERO'
+           AND cc.parent_object_id = OBJECT_ID('dbo.TIEMPO')
+    )
         ALTER TABLE dbo.TIEMPO
         DROP CONSTRAINT CHK_TIEMPO_NO_ZERO;
-    END
 
     -----------------------------------------------------------------
-    -- 3) Restaurar columna TIEMPO.tiempo_registrado
+    -- 3) Restaurar TIEMPO.tiempo_registrado al estado NOT NULL
     -----------------------------------------------------------------
-    -- 3.1 Dejarla NOT NULL
-    ALTER TABLE dbo.TIEMPO
-    ALTER COLUMN tiempo_registrado TIME NOT NULL;
+    DECLARE @nUpdated INT;
+    UPDATE dbo.TIEMPO
+        SET tiempo_registrado = '00:00:00'
+    WHERE tiempo_registrado IS NULL;
+    SET @nUpdated = @@ROWCOUNT;
+    PRINT CONCAT(@nUpdated, ' filas actualizadas en TIEMPO.tiempo_registrado');
 
-    -- 3.2 (Opcional) Eliminar default introducido en otros pasos
     DECLARE @df_tiempo NVARCHAR(128);
     SELECT @df_tiempo = dc.name
       FROM sys.default_constraints dc
@@ -80,13 +85,16 @@ BEGIN TRY
        AND dc.parent_column_id = c.column_id
      WHERE dc.parent_object_id = OBJECT_ID('dbo.TIEMPO')
        AND c.name = 'tiempo_registrado';
+
     IF @df_tiempo IS NOT NULL
         EXEC('ALTER TABLE dbo.TIEMPO DROP CONSTRAINT ' + @df_tiempo);
+    
+    ALTER TABLE dbo.TIEMPO
+      ALTER COLUMN tiempo_registrado TIME NOT NULL;
 
     -----------------------------------------------------------------
-    -- 4) Quitar columna is_active de CARRERA
+    -- 4) Quitar la columna opcional is_active de CARRERA
     -----------------------------------------------------------------
-    -- 4.1 Eliminar default si existe
     DECLARE @df_carrera NVARCHAR(128);
     SELECT @df_carrera = dc.name
       FROM sys.default_constraints dc
@@ -95,20 +103,18 @@ BEGIN TRY
        AND dc.parent_column_id = c.column_id
      WHERE dc.parent_object_id = OBJECT_ID('dbo.CARRERA')
        AND c.name = 'is_active';
+
     IF @df_carrera IS NOT NULL
         EXEC('ALTER TABLE dbo.CARRERA DROP CONSTRAINT ' + @df_carrera);
 
-    -- 4.2 Eliminar la columna
     IF EXISTS (
         SELECT 1
           FROM sys.columns
          WHERE object_id = OBJECT_ID('dbo.CARRERA')
            AND name = 'is_active'
     )
-    BEGIN
         ALTER TABLE dbo.CARRERA
         DROP COLUMN is_active;
-    END
 
     -----------------------------------------------------------------
     -- 5) (Opcional) Restaurar cualquier default original 
@@ -122,6 +128,8 @@ BEGIN TRY
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
-    ROLLBACK TRANSACTION;
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRANSACTION;
     THROW;
 END CATCH;
+GO
