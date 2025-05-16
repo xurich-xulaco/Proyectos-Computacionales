@@ -1,6 +1,3 @@
-USE [Cronometraje_Carreras_Deportivas];
-GO
-
 -----------------------------------------------------------------------
 -- 0. (Opcional) Agregar columna para borrado lógico de carreras
 -----------------------------------------------------------------------
@@ -20,61 +17,34 @@ GO
 */
 
 -----------------------------------------------------------------------
--- 1. Unicidad Carrera–Categoría (evita duplicar una misma categoría)
+-- 1. Evitar repetir una misma categoría en una carrera
 -----------------------------------------------------------------------
-IF NOT EXISTS (
-    SELECT 1 FROM sys.key_constraints k
-     WHERE k.name = 'UQ_CARR_Cat_CarreraCategoria'
-       AND k.parent_object_id = OBJECT_ID('dbo.CARR_Cat')
-)
-BEGIN
-    ALTER TABLE dbo.CARR_Cat
-      ADD CONSTRAINT UQ_CARR_Cat_CarreraCategoria
-          UNIQUE (ID_carrera, ID_categoria);
-END
+ALTER TABLE dbo.CARR_Cat
+ADD CONSTRAINT UQ_CARR_Cat_CarreraCategoria
+    UNIQUE (ID_carrera, ID_categoria);
 GO
 
 -----------------------------------------------------------------------
 -- 2. Integridad referencial: impedir borrar corredor con vínculos
 -----------------------------------------------------------------------
-IF NOT EXISTS (
-    SELECT 1 FROM sys.foreign_keys fk
-     WHERE fk.name = 'FK_VP_Corredor'
-       AND fk.parent_object_id = OBJECT_ID('dbo.Vincula_participante')
-)
-BEGIN
-    ALTER TABLE dbo.Vincula_participante
-      ADD CONSTRAINT FK_VP_Corredor
-        FOREIGN KEY (ID_corredor)
-        REFERENCES dbo.CORREDOR (ID_corredor)
-        ON DELETE NO ACTION;
-END
+ALTER TABLE dbo.Vincula_participante
+ADD CONSTRAINT FK_VP_Corredor
+    FOREIGN KEY (ID_corredor)
+    REFERENCES dbo.CORREDOR (ID_corredor)
+    ON DELETE NO ACTION;
 GO
 
 -----------------------------------------------------------------------
 -- 3. Garantizar unicidad de chip y de inscripción por carrera
 -----------------------------------------------------------------------
-IF NOT EXISTS (
-    SELECT 1 FROM sys.indexes i
-     WHERE i.name = 'UQ_VP_FolioChip'
-       AND i.object_id = OBJECT_ID('dbo.Vincula_participante')
-)
-BEGIN
-    ALTER TABLE dbo.Vincula_participante
-      ADD CONSTRAINT UQ_VP_FolioChip UNIQUE (folio_chip);
-END
+ALTER TABLE dbo.Vincula_participante
+ADD CONSTRAINT UQ_VP_FolioChip
+    UNIQUE (folio_chip);
 GO
 
-IF NOT EXISTS (
-    SELECT 1 FROM sys.indexes i
-     WHERE i.name = 'UQ_VP_CorredorCarrera'
-       AND i.object_id = OBJECT_ID('dbo.Vincula_participante')
-)
-BEGIN
-    ALTER TABLE dbo.Vincula_participante
-      ADD CONSTRAINT UQ_VP_CorredorCarrera
-          UNIQUE (ID_corredor, ID_carr_cat);
-END
+ALTER TABLE dbo.Vincula_participante
+ADD CONSTRAINT UQ_VP_CorredorCarrera
+    UNIQUE (ID_corredor, ID_carr_cat);
 GO
 
 -----------------------------------------------------------------------
@@ -88,71 +58,18 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- 5.1: Rechaza duplicados exactos
-    IF EXISTS (
-        SELECT 1
-          FROM inserted i
-          JOIN dbo.Vincula_participante vp
-            ON vp.ID_corredor = i.ID_corredor
-           AND vp.ID_carr_cat = i.ID_carr_cat
-    )
-    BEGIN
-        RAISERROR('El corredor ya está asociado a esta categoría de la carrera.',16,1);
-        RETURN;
-    END
-
-    -- 5.2: Rechaza si ya tiene otra categoría en la misma carrera
-    IF EXISTS (
-        SELECT 1
-          FROM inserted i
-          JOIN dbo.CARR_Cat newcc ON newcc.ID_carr_cat = i.ID_carr_cat
-          JOIN dbo.Vincula_participante vpold
-            ON vpold.ID_corredor = i.ID_corredor
-          JOIN dbo.CARR_Cat oldcc
-            ON oldcc.ID_carr_cat = vpold.ID_carr_cat
-         WHERE newcc.ID_carrera = oldcc.ID_carrera
-    )
-    BEGIN
-        RAISERROR('El corredor ya está inscrito en otra categoría de esta carrera.',16,1);
-        RETURN;
-    END
-
-    -- 5.3: Calcular secuencia para cada fila y hacer el INSERT
-    ;WITH ToInsert AS (
-        SELECT
-          i.ID_corredor,
-          i.ID_carr_cat,
-          cc.ID_carrera,
-          ROW_NUMBER() OVER (
-            PARTITION BY cc.ID_carrera 
-            ORDER BY i.ID_corredor
-          ) AS seq
-        FROM inserted i
-        JOIN dbo.CARR_Cat cc
-          ON cc.ID_carr_cat = i.ID_carr_cat
-    ), BaseNum AS (
-        SELECT
-          cc.ID_carrera,
-          ISNULL(MAX(vp.num_corredor),0) AS max_num
-        FROM dbo.Vincula_participante vp
-        JOIN dbo.CARR_Cat cc
-          ON vp.ID_carr_cat = cc.ID_carr_cat
-        WHERE cc.ID_carrera IN (
-            SELECT DISTINCT ID_carrera FROM ToInsert
-        )
-        GROUP BY cc.ID_carrera
-    )
     INSERT INTO dbo.Vincula_participante
-      (ID_vinculo, ID_corredor, ID_carr_cat, num_corredor, folio_chip)
+        (ID_vinculo, ID_corredor, ID_carr_cat, num_corredor, folio_chip)
     SELECT
-      NEWID(),
-      ti.ID_corredor,
-      ti.ID_carr_cat,
-      bn.max_num + ti.seq,
-      'RFID' + CAST(1000000000 + bn.max_num + ti.seq AS VARCHAR(20))
-    FROM ToInsert ti
-    JOIN BaseNum bn
-      ON bn.ID_carrera = ti.ID_carrera;
+        NEWID(),
+        i.ID_corredor,
+        i.ID_carr_cat,
+        ISNULL(MAX(vp.num_corredor), 0) + 1,
+        'RFID' + CAST(1000000000 + (ISNULL(MAX(vp.num_corredor), 0) + 1) AS VARCHAR(20))
+    FROM inserted i
+    LEFT JOIN dbo.Vincula_participante vp
+      ON vp.ID_carr_cat = i.ID_carr_cat
+    GROUP BY i.ID_corredor, i.ID_carr_cat;
 END;
 GO
 
