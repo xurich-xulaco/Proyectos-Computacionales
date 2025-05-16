@@ -562,22 +562,17 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         [HttpPost]
         public async Task<IActionResult> Crear_Corredor(string Nombre, string Apaterno, string? Amaterno, DateTime Fnacimiento, string Sexo, string? Correo, string Pais, string? Telefono, int CarreraId, string CategoriaNombre)
         {
-            var connStr = _configuration.GetConnectionString("DefaultConnection");
-            await using var connection = new SqlConnection(connStr);
-            await connection.OpenAsync();
-
-            // Declaración en ámbito externo:
-            SqlTransaction? transaction = null;
-
             try
             {
+                var connStr = _configuration.GetConnectionString("DefaultConnection");
+                await using var connection = new SqlConnection(connStr);
+                await connection.OpenAsync();
+
+                // Iniciar la transacción (síncrona, pero no bloquea E/S)
+                using var transaction = connection.BeginTransaction();
+
                 // 1) Insertar o recuperar el corredor
-                byte[] corredorId;
-
-                // Inicialización asíncrona y cast al tipo concreto:
-                var dbTx = await connection.BeginTransactionAsync();
-                transaction = (SqlTransaction)dbTx;
-
+                Guid corredorId;
                 try
                 {
                     const string sqlInsert = @"
@@ -598,7 +593,7 @@ VALUES (@Nombre,@Apaterno,@Amaterno,@Fnacimiento,@Sexo,@Correo,@Pais);
                                       : (object)Correo;
                     cmdIns.Parameters.Add("@Pais", SqlDbType.NVarChar, 100).Value = Pais;
 
-                    corredorId = (byte[])await cmdIns.ExecuteScalarAsync();
+                    corredorId = (Guid)await cmdIns.ExecuteScalarAsync();
                 }
                 catch (SqlException ex) when (ex.Number == 2627) // duplicado
                 {
@@ -616,7 +611,7 @@ SELECT ID_corredor
                     cmdGet.Parameters.Add("@Amaterno", SqlDbType.NVarChar, 100).Value = (object?)Amaterno ?? DBNull.Value;
                     cmdGet.Parameters.Add("@Fnacimiento", SqlDbType.Date).Value = Fnacimiento;
 
-                    corredorId = (byte[])await cmdGet.ExecuteScalarAsync();
+                    corredorId = (Guid)await cmdGet.ExecuteScalarAsync();
                 }
 
                 // 2) Obtener el ID de la combinación Carrera–Categoría
@@ -648,7 +643,7 @@ VALUES
   (NEWID(), @IDCorredor, @IDCarrCat);
 ";
                 await using var cmdVinc = new SqlCommand(sqlInsertVinculo, connection, transaction);
-                cmdVinc.Parameters.Add("@IDCorredor", SqlDbType.VarBinary, 5).Value = corredorId;
+                cmdVinc.Parameters.Add("@IDCorredor", SqlDbType.UniqueIdentifier).Value = corredorId;
                 cmdVinc.Parameters.Add("@IDCarrCat", SqlDbType.Int).Value = idCarrCat;
                 await cmdVinc.ExecuteNonQueryAsync();
 
@@ -668,22 +663,18 @@ VALUES
                 }
 
                 // 4) Confirmar transacción y devolver sólo éxito
-                await transaction.CommitAsync();
+                transaction.Commit();
                 return Json(new { success = true, message = "Corredor vinculado exitosamente a la carrera." });
             }
             catch (SqlException ex) when (ex.Number == 50000)
             {
-                if (transaction is not null)
-                    await transaction.RollbackAsync();
                 _logger.LogWarning(ex, "Error en la transacción con la base de datos al vincular corredor");
                 return Json(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {
-                if (transaction is not null)
-                    await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error inesperado al vincular corredor");
-                throw;
+                return Json(new { success = false, message = "Ocurrió un error al vincular el corredor." });
             }
         }
 
