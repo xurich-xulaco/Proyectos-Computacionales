@@ -647,28 +647,13 @@ VALUES
                 cmdVinc.Parameters.Add("@IDCarrCat", SqlDbType.Int).Value = idCarrCat;
                 await cmdVinc.ExecuteNonQueryAsync();
 
-                // Confirmar inserción de telefono
-                if (!string.IsNullOrWhiteSpace(Telefono))
-                {
-                    const string sqlInsertTelefono = @"
-INSERT INTO dbo.TELEFONO
-  (numero, ID_Corredor)
-VALUES
-  (@Numero, @IDCorredor);";
-
-                    await using var cmdTel = new SqlCommand(sqlInsertTelefono, connection, transaction);
-                    cmdTel.Parameters.Add("@Numero", SqlDbType.VarChar, 15).Value = Telefono;
-                    cmdTel.Parameters.Add("@IDCorredor", SqlDbType.VarBinary, 5).Value = corredorId;
-                    await cmdTel.ExecuteNonQueryAsync();
-                }
-
                 // 4) Confirmar transacción y devolver sólo éxito
                 transaction.Commit();
                 return Json(new { success = true, message = "Corredor vinculado exitosamente a la carrera." });
             }
             catch (SqlException ex) when (ex.Number == 50000)
             {
-                _logger.LogWarning(ex, "Error en la transacción con la base de datos al vincular corredor");
+                _logger.LogWarning(ex, "Error de negocio al vincular corredor");
                 return Json(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
