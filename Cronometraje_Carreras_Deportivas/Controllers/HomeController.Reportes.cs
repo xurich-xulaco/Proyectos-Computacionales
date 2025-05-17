@@ -616,7 +616,7 @@ WHERE num_corredor = @numCorredor;
                 SELECT 
                     nom_carrera AS NombreCarrera, 
                     year_carrera AS Año, 
-                    edi_carrera AS Edicion
+                    edi_carrera AS Edición
                 FROM 
                     CARRERA
                 WHERE 
@@ -631,7 +631,7 @@ WHERE num_corredor = @numCorredor;
                     {
                         string carreraNombre = reader["NombreCarrera"].ToString();
                         string carreraAño = reader["Año"].ToString();
-                        string carreraEdicion = reader["Edicion"].ToString();
+                        string carreraEdicion = reader["Edición"].ToString();
 
                         InformacionDeCarrera = new ReporteCarreras_CarreraInfo(carreraNombre, carreraAño, carreraEdicion);
                     }
@@ -1192,13 +1192,9 @@ FROM TotalTiempos;";
 
                     // 1. Obtener datos básicos de la carrera
                     carreraInfo = await ReporteCarreras_GetInfo(carreraId, connection);
-                    if (string.IsNullOrEmpty(carreraInfo.Nombre))
-                        return Json(new { success = false, message = "Carrera no encontrada o ya fue eliminada." });
 
                     // 2. Obtener categorías asociadas a la carrera
                     categorias = await ReporteCarreras_ListaCategorias(carreraId, connection);
-                    if (categorias == null || categorias.Count == 0)
-                        return Json(new { success = false, message = "No hay categorías asociadas a esta carrera." });
 
                     // 3. Filtrar la categoría con menor km y limitar a 2 si es necesario
                     if (categorias.Count > 0)
