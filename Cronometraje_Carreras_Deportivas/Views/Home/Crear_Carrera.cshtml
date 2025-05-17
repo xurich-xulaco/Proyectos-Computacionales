@@ -25,20 +25,17 @@
             <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 15px;">
                 @for (int i = 0; i < 3; i++)
                 {
-                                        int index = i + 1;
-                    <div style="text-align:center">
-                        <label>Categoria @index  <span class="text-danger">*</span></label>
-                    <select name="categoriasSeleccionadas" class="form-control"  required>
-                        <option value="">Selecciona</option>
-                        @foreach (var categoria in ViewBag.Categorias as List<SelectListItem>)
-                        {
-                            <label>categoria</label>
-                            <br />
-
-                            <option value="@categoria.Value">@categoria.Text</option>
-                        }
-                    </select>
-                        </div>
+                    int index = i + 1;
+                    <div style="text-align:center; margin-bottom: 1rem;">
+                        <label for="categoria-@index">Categoría @index <span class="text-danger">*</span></label>
+                        <select name="categoriasSeleccionadas" class="form-control" id="categoria-@index" required>
+                            <option value="">Selecciona</option>
+                            @foreach (var categoria in ViewBag.Categorias as List<SelectListItem>)
+                            {
+                                <option value="@categoria.Value">@categoria.Text</option>
+                            }
+                        </select>
+                    </div>
                 }
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 20px;">
@@ -55,6 +52,30 @@
         document.getElementById('crearCarreraForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const formData = new FormData(this);
+
+            const selects = document.querySelectorAll('select[name="categoriasSeleccionadas"]');
+            const values = Array.from(selects).map(select => select.value);
+
+            const hasEmpty = values.includes('');
+            const hasDuplicates = new Set(values).size !== values.length;
+
+            if (hasEmpty) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Atención',
+                    text: 'Por favor, selecciona una categoría en cada lista.'
+                });
+                return;
+            }
+
+            if (hasDuplicates) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Categorías repetidas',
+                    text: 'No se pueden seleccionar categorías duplicadas.'
+                });
+                return;
+            }
 
             try {
                 const response = await fetch('@Url.Action("Crear_Carrera", "Home")', {
