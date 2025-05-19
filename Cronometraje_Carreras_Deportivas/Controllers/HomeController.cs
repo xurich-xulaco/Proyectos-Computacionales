@@ -147,7 +147,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                     await connection.OpenAsync();
 
                     // Verificar credenciales del super administrador (sin hashing)
-                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 16";
+                    string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@SuperUsuario", superUsuario);
@@ -188,6 +188,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
         {
             return View("Baja_administrador");
         }
+
         [HttpPost]
         public async Task<IActionResult> Baja_administrador(string usuario, string superUsuario, string superContrasena)
         {
@@ -198,7 +199,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Verificar credenciales del superadministrador
+                    // Verificar credenciales del superadministrador (ID_admin = 1)
                     string checkSql = "SELECT COUNT(*) FROM ADMINISTRADOR WHERE uss_admin = @SuperUsuario AND pass_admin = @SuperContrasena AND ID_admin = 1";
                     using (SqlCommand checkCommand = new SqlCommand(checkSql, connection))
                     {
@@ -213,7 +214,21 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                         }
                     }
 
-                    // Eliminar el usuario si las credenciales fueron correctas
+                    // Verificar si el usuario a eliminar es el superadministrador (ID_admin = 1)
+                    string checkTargetSql = "SELECT ID_admin FROM ADMINISTRADOR WHERE uss_admin = @Usuario";
+                    using (SqlCommand checkTargetCommand = new SqlCommand(checkTargetSql, connection))
+                    {
+                        checkTargetCommand.Parameters.AddWithValue("@Usuario", usuario);
+                        object result = await checkTargetCommand.ExecuteScalarAsync();
+
+                        if (result != null && Convert.ToInt32(result) == 1)
+                        {
+                            TempData["Irrevocable"] = "El usuario seleccionado es un superadministrador con privilegios irrevocables.";
+                            return View("Baja_administrador");
+                        }
+                    }
+
+                    // Eliminar el usuario si no es el superadministrador
                     string deleteSql = "DELETE FROM ADMINISTRADOR WHERE uss_admin = @Usuario";
                     using (SqlCommand deleteCommand = new SqlCommand(deleteSql, connection))
                     {
@@ -238,6 +253,7 @@ namespace Cronometraje_Carreras_Deportivas.Controllers
                 return View("Baja_administrador");
             }
         }
+
 
         [HttpPost]
         public async Task<IActionResult> BuscarCorredores(int? yearCarrera, int? ediCarrera, string categoria, string nombreCorredor)
